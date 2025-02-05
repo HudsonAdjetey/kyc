@@ -140,7 +140,7 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
               videoConstraints={{ facingMode: "environment" }}
               className="absolute inset-0 w-full h-full object-cover"
             />
-            <Overlay type="document" />
+            <Overlay type="document"  />
           </>
         ) : (
           <div className="flex items-center gap-3 justify-center h-full">
