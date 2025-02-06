@@ -15,8 +15,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const Personal = () => {
-    const router = useRouter();
-  
+  const router = useRouter();
+
   const {
     register,
     handleSubmit,
@@ -26,28 +26,23 @@ const Personal = () => {
     defaultValues: {
       phoneNumber: "",
       fullName: "",
-      email: "",
-      address: "",
     },
   });
   const onSubmit = (data: {
     phoneNumber: string;
     fullName: string;
-    email: string;
-    address: string;
   }) => {
     console.log(data);
     if (data) {
-      console.log("data")
+      console.log("data");
     }
-    if (data.address && data.fullName && data.fullName && data.phoneNumber) {
+    if ( data.fullName && data.phoneNumber) {
       router.push("/verification/info-upload");
     }
   };
 
-
   return (
-    <div className="container mx-auto px-4 py-10">
+    <div className="container mx-auto px-10 py-10">
       <Link href={"/verification"} className="mb-6 flex items-center gap-3">
         <ChevronLeft className="w-4 h-4 mr-2" />
         Back to Verification Types
@@ -66,37 +61,6 @@ const Personal = () => {
               className={`${errors.fullName ? "border-red-500" : ""} `}
             />
             <p className="text-red-500 text-sm">{errors?.fullName?.message}</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              {...register("email", {
-                required: "Email is required",
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: "Invalid email address",
-                },
-              })}
-              className={`${errors.email ? "border-red-500" : ""} p-2`}
-            />
-            {errors.address && (
-              <p className="text-red-500 text-sm">{errors?.email!.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              {...register("address", { required: "Address is required" })}
-              className={errors.address ? "border-red-500" : ""}
-            />
-            {errors.address && (
-              <p className="text-red-500 text-sm">{errors.address.message}</p>
-            )}
           </div>
 
           <div className="space-y-2">
