@@ -166,7 +166,7 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
                   className="absolute inset-0 pointer-events-none"
                   initial={false}
                 >
-                  <div className="absolute inset-[10%] border-2 border-dashed border-white/70">
+                  <div className="absolute inset-[4%]  border-2 border-dashed border-white/70">
                     <motion.div
                       className="absolute inset-0 border border-green-500/50"
                       animate={{
@@ -188,7 +188,7 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
                     ].map((position) => (
                       <motion.div
                         key={position}
-                        className={`absolute w-6 h-6 ${position}`}
+                        className={`absolute  w-6 h-6 ${position}`}
                         initial={false}
                         animate={{
                           opacity: [1, 0.5, 1],
@@ -217,21 +217,6 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
                   </div>
 
                   {/* Guidance text */}
-                  <div className="absolute inset-x-0 bottom-4 flex justify-center">
-                    <motion.div
-                      className="bg-black/70 text-white text-sm px-4 py-2 rounded-full"
-                      animate={{
-                        opacity: [0.8, 1, 0.8],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                    >
-                      Center your ID card within the frame
-                    </motion.div>
-                  </div>
                 </motion.div>
               </motion.div>
             ) : (
@@ -253,11 +238,11 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
           </AnimatePresence>
         </div>
 
-        <div className="mt-8 flex justify-center gap-4">
+        <div className="mt-8 flex max-md:flex-col justify-center gap-4">
           <button
             onClick={stream ? stopCamera : initializeCamera}
             disabled={processing}
-            className="px-6 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors
+            className="px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 transition-colors
                      bg-white border border-gray-200 hover:bg-gray-50 text-gray-700
                      disabled:bg-gray-100 disabled:text-gray-400"
           >
@@ -278,7 +263,7 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
             <button
               onClick={captureImage}
               disabled={processing}
-              className="px-6 py-2 rounded-lg font-medium flex items-center gap-2
+              className="px-6 py-3 rounded-lg font-medium flex  justify-center items-center gap-2
                        bg-orange-500 text-white hover:bg-orange-400 transition-colors
                        disabled:bg-orange-200"
             >
@@ -292,7 +277,7 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
               stopCamera();
               onCancel();
             }}
-            className="px-6 py-2 rounded-lg font-medium flex items-center gap-2
+            className="px-6 py-3 justify-center rounded-lg font-medium flex items-center gap-2
                      bg-white border border-gray-200 hover:bg-gray-50 text-gray-700"
           >
             <X className="w-4 h-4" />
