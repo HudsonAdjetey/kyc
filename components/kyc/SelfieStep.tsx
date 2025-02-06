@@ -237,8 +237,7 @@ export const SelfieStep: React.FC<SelfieStepProps> = ({
   }, [lastBlinkTime]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-6">
-      {/* Professional Header */}
+    <div className="w-full  mx-auto px-2  py-6">
       <div className="mb-8">
         <div className="flex items-center gap-2 text-gray-500 mb-2">
           <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
@@ -255,7 +254,7 @@ export const SelfieStep: React.FC<SelfieStepProps> = ({
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
         {/* Camera Section */}
-        <div className="relative max-w-2xl mx-auto">
+        <div className="relative  max-w-3xl mx-auto">
           {/* Status Overlay */}
           {!captured && (
             <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-10">
@@ -301,8 +300,8 @@ export const SelfieStep: React.FC<SelfieStepProps> = ({
             </div>
           )}
           {/* Guidelines */}
-          <div className="max-w-2xl mx-auto my-8">
-            <div className="flex items-start gap-3 text-gray-600 text-sm">
+          <div className="max-w-2xl mx-auto  my-8">
+            <div className="xl:flex items-start gap-3 hidden  text-gray-600 text-sm">
               <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
               <div>
                 <p className="font-medium text-gray-900 mb-2">
@@ -319,7 +318,7 @@ export const SelfieStep: React.FC<SelfieStepProps> = ({
           </div>
 
           {/* Camera Container */}
-          <div className="aspect-[5/4] max-w-md mx-auto relative rounded-xl overflow-hidden border-2 border-gray-200">
+          <div className="aspect-[5/5] max-w-xl mx-auto relative rounded-xl overflow-hidden border-2 border-gray-200">
             <div
               className={`absolute inset-0 border-2 ${
                 validFace ? "border-green-500" : "border-gray-300"
