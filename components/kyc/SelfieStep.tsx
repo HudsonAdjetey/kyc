@@ -3,9 +3,10 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
 import { FaCheckSquare } from "react-icons/fa";
-import { Label } from "@/components/ui/label";
 import { detectFace, startCamera } from "@/lib/utils/index";
 import Image from "next/image";
+import { AlertCircle } from "lucide-react";
+import { FaCamera } from "react-icons/fa6";
 
 interface SelfieStepProps {
   onComplete: (image: string) => void;
@@ -85,7 +86,7 @@ export const SelfieStep: React.FC<SelfieStepProps> = ({
 
     const interval = setInterval(async () => {
       if (!webCamRef.current || !webCamRef.current.video) {
-        console.error("Webcam or video element is not available");
+        console.log("Webcam or video element is not available");
         setErrState("Camera is not ready. Please wait or refresh the page.");
         return;
       }
@@ -195,7 +196,7 @@ export const SelfieStep: React.FC<SelfieStepProps> = ({
           setErrState("No face detected. Please ensure your face is visible.");
         }
       } catch (error) {
-        console.error("Face detection error:", error);
+        console.log("Face detection error:", error);
         setErrState(
           "Failed to detect face. Please ensure your face is visible and try again."
         );
@@ -236,109 +237,170 @@ export const SelfieStep: React.FC<SelfieStepProps> = ({
   }, [lastBlinkTime]);
 
   return (
-    <div className="space-y-6">
-      {/* Step Header */}
-      <div className="space-y-3">
-        <p className="text-lg text-gray-400">STEP 2</p>
-        <h1 className="text-3xl max-md:text-xl text-green-500">Selfie</h1>
+    <div className="w-full max-w-4xl mx-auto px-4 py-6">
+      {/* Professional Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 text-gray-500 mb-2">
+          <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+            Step 2 of 5
+          </span>
+        </div>
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Identity Verification
+        </h1>
+        <p className="text-gray-600 mt-2">
+          Please take a clear photo of your face
+        </p>
       </div>
 
-      {/* Face Detection Status */}
-      <div className="max-w-xl relative mt-10 flex flex-col items-center mx-auto">
-        {!captured && (
-          <div className="absolute -top-32 my-10 text-white text-sm text-center space-y-2 bg-black/50 p-2 rounded">
-            {detectionError ? (
-              <p className="text-red-400">{detectionError}</p>
-            ) : (
-              <>
-                {!validFace && (
-                  <p>{err || "Position your face within the circle"}</p>
-                )}
-
-                {faceStage === "leftRight" && (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        {/* Camera Section */}
+        <div className="relative max-w-2xl mx-auto">
+          {/* Status Overlay */}
+          {!captured && (
+            <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-10">
+              <div className="bg-gray-900/90 backdrop-blur text-white px-4 py-2 rounded-lg text-sm text-center min-w-[200px]">
+                {detectionError ? (
+                  <p className="text-red-400 animate-pulse">{detectionError}</p>
+                ) : (
                   <>
-                    <p>Slowly turn your head left and right</p>
-                    <p>
-                      Left: {leftFaceDetected ? "✅" : "❌"} Right:{" "}
-                      {rightFaceDetected ? "✅" : "❌"}
-                    </p>
+                    {!validFace && (
+                      <p>{err || "Position your face within the frame"}</p>
+                    )}
+                    {faceStage === "leftRight" && (
+                      <div>
+                        <p>Turn head slowly left and right</p>
+                        <div className="flex justify-center gap-4 mt-2">
+                          <span
+                            className={`transition-colors duration-300 ${
+                              leftFaceDetected
+                                ? "text-green-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            Left ✓
+                          </span>
+                          <span
+                            className={`transition-colors duration-300 ${
+                              rightFaceDetected
+                                ? "text-green-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            Right ✓
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {faceStage === "blink" && !blinkCompleted && (
+                      <p>Blink naturally a few times</p>
+                    )}
                   </>
                 )}
-
-                {faceStage === "blink" && !blinkCompleted && (
-                  <>
-                    <p>Blink your eyes a few times</p>
-                  </>
-                )}
-              </>
-            )}
+              </div>
+            </div>
+          )}
+          {/* Guidelines */}
+          <div className="max-w-2xl mx-auto my-8">
+            <div className="flex items-start gap-3 text-gray-600 text-sm">
+              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+              <div>
+                <p className="font-medium text-gray-900 mb-2">
+                  Important Guidelines:
+                </p>
+                <ul className="space-y-2">
+                  <li>• Ensure your face is well-lit and clearly visible</li>
+                  <li>• Remove any sunglasses or face coverings</li>
+                  <li>• Keep a neutral expression and look straight ahead</li>
+                  <li>• Use a plain background if possible</li>
+                </ul>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Camera Container */}
-        <div className="w-[350px] mt-10 max-w-xs h-[380px] rounded-full border-green-500 border-dashed relative border overflow-hidden">
-          {stream ? (
-            <>
+          {/* Camera Container */}
+          <div className="aspect-[5/4] max-w-md mx-auto relative rounded-xl overflow-hidden border-2 border-gray-200">
+            <div
+              className={`absolute inset-0 border-2 ${
+                validFace ? "border-green-500" : "border-gray-300"
+              } rounded-xl transition-colors duration-300`}
+            />
+
+            {stream ? (
               <Webcam
                 ref={webCamRef}
                 audio={false}
                 screenshotFormat="image/png"
-                videoConstraints={{ facingMode: "user" }}
-                className="absolute inset-0 w-full h-full object-cover"
+                videoConstraints={{
+                  facingMode: "user",
+                  width: { min: 720, ideal: 1280 },
+                  height: { min: 720, ideal: 1280 },
+                  aspectRatio: 0.8,
+                }}
+                className="w-full h-full object-cover"
               />
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              {image ? (
-                <Image
-                  width={300}
-                  height={300}
-                  alt="profile"
-                  src={image || "/placeholder.svg"}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <p>Camera not started</p>
-              )}
-            </div>
-          )}
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full bg-gray-50">
+                {image ? (
+                  <Image
+                    width={720}
+                    height={900}
+                    alt="profile"
+                    src={image || "/placeholder.svg"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-center">
+                    <FaCamera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500">Camera not initialized</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Progress Indicators */}
+          <div className="mt-8 grid grid-cols-3 gap-4 max-w-lg mx-auto">
+            {[
+              { label: "Face Detected", completed: validFace },
+              { label: "Movement Check", completed: leftRightCompleted },
+              { label: "Liveness Check", completed: blinkCompleted },
+            ].map((status) => (
+              <div
+                key={status.label}
+                className="flex flex-col items-center gap-2 text-center"
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    status.completed ? "bg-orange-500" : "bg-gray-200"
+                  } transition-colors duration-300`}
+                >
+                  <FaCheckSquare
+                    className={`w-4 h-4 ${
+                      status.completed ? "text-white" : "text-gray-400"
+                    }`}
+                  />
+                </div>
+                <span className="text-sm text-gray-600">{status.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Status Checkmarks */}
-        <div className="my-6 flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <FaCheckSquare
-              size={30}
-              className={validFace ? "text-green-400" : "text-gray-300"}
-            />
-            <Label className="text-gray-600 text-lg">Valid Face</Label>
-          </div>
-          <div className="flex items-center gap-4">
-            <FaCheckSquare
-              size={30}
-              className={
-                leftRightCompleted ? "text-green-400" : "text-gray-300"
-              }
-            />
-            <Label className="text-gray-600 text-lg">Left & Right</Label>
-          </div>
-          <div className="flex items-center gap-4">
-            <FaCheckSquare
-              size={30}
-              className={blinkCompleted ? "text-green-400" : "text-gray-300"}
-            />
-            <Label className="text-gray-600 text-lg">Blink Eyes</Label>
-          </div>
-        </div>
+        {/* Action Button */}
+        <div className="mt-8 max-w-md mx-auto">
+          <button
+            disabled={!validFace || !leftRightCompleted || !blinkCompleted}
+            className="w-full py-3 px-4 bg-orange-500 text-white rounded-lg font-medium disabled:bg-gray-200 disabled:text-gray-400 transition-all duration-300 hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            onClick={setStep}
+          >
+            Continue to Next Step
+          </button>
 
-        {/* Proceed Button */}
-        <button
-          disabled={!validFace || !leftRightCompleted || !blinkCompleted}
-          className="py-4 mx-auto text-white mt-6 w-full bg-orange-400 disabled:bg-orange-100 rounded-md disabled:select-none transition-all duration-300"
-          onClick={setStep}
-        >
-          Proceed
-        </button>
+          <p className="text-xs text-gray-500 text-center mt-4">
+            Your photo will be used only for identity verification purposes
+          </p>
+        </div>
       </div>
     </div>
   );

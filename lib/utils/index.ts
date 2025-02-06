@@ -54,7 +54,6 @@ export async function detectFace(
       (video && video.videoWidth === 0) ||
       (video && video.videoHeight === 0)
     ) {
-      // console.error("Video dimensions are not available yet");
       return getDefaultFaceDetectionResult();
     }
 

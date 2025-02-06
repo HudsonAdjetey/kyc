@@ -16,7 +16,7 @@ interface VerificationStep {
 interface FaceDetectionCaseType {
 faceDetected: boolean
   multipleFaces: boolean
-  facePositioning: {
+  facePositioning?: {
     x: number
     y: number
     width: number

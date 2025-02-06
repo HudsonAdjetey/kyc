@@ -4,7 +4,7 @@ import { CompleteStep } from "@/components/kyc/CompleteStep";
 import { DocumentStep } from "@/components/kyc/DocumentStep";
 import { PreloadStep } from "@/components/kyc/PreloadStep";
 import { SelfieStep } from "@/components/kyc/SelfieStep";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const KycVerification = () => {
   const [steps, setSteps] = useState<VerificationStep[]>([
@@ -89,7 +89,6 @@ const KycVerification = () => {
               completeStep("selfie");
             }}
             setStep={() => setStep("document")}
-          
             image={images.selfie || ""}
           />
         );
@@ -116,7 +115,14 @@ const KycVerification = () => {
         return null;
     }
   };
+  useEffect(() => {
+    if (!err) return;
+    const interval = setInterval(() => {
+      setErr(null);
+    }, 5000);
 
+    return () => clearInterval(interval);
+  }, [err]);
   return (
     <section className="container mx-auto px-4 py-8">
       {renderStep()}
