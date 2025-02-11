@@ -402,7 +402,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
 
               {isCapturing && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-[60%] h-[80%] border-2 border-white rounded-full opacity-50 animate-pulse" />
+                  <div className="max-sm:w-[80%] w-[60%] h-[80%] border-2 border-white rounded-full opacity-50 animate-pulse" />
                 </div>
               )}
             </div>
