@@ -68,37 +68,8 @@ const Personal = () => {
             <p className="text-red-500 text-sm">{errors?.fullName?.message}</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              {...register("email", {
-                required: "Email is required",
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: "Invalid email address",
-                },
-              })}
-              className={`${errors.email ? "border-red-500" : ""} p-2`}
-            />
-            {errors.address && (
-              <p className="text-red-500 text-sm">{errors?.email!.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              {...register("address", { required: "Address is required" })}
-              className={errors.address ? "border-red-500" : ""}
-            />
-            {errors.address && (
-              <p className="text-red-500 text-sm">{errors.address.message}</p>
-            )}
-          </div>
-
+      
+     
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
             <Controller

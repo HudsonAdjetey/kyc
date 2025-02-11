@@ -7,7 +7,7 @@ import {
   type ImageQuality,
   type EyeOpen,
 } from "@aws-sdk/client-rekognition"
-import type { VerificationResponse, VerificationStepId } from "/types/kyc"
+import type { VerificationResponse, VerificationStepId } from "@/types/kyc"
 
 const rekognition = new RekognitionClient({
   region: process.env.AWS_REGION,
