@@ -26,21 +26,17 @@ const Personal = () => {
     defaultValues: {
       phoneNumber: "",
       fullName: "",
-      email: "",
-      address: "",
     },
   });
   const onSubmit = (data: {
     phoneNumber: string;
     fullName: string;
-    email: string;
-    address: string;
   }) => {
     console.log(data);
     if (data) {
       console.log("data")
     }
-    if (data.address && data.fullName && data.fullName && data.phoneNumber) {
+    if (data.fullName && data.phoneNumber) {
       router.push("/verification/info-upload");
     }
   };
