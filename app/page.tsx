@@ -81,7 +81,7 @@ const subscribeAnimation = {
 
 const Home = () => {
   return (
-    <main className="px-20 overflow-x-clip min-h-screen container py-10 max-sm:px-5">
+    <main className="px-10 overflow-x-clip min-h-screen container py-10 max-sm:px-5">
       <motion.section className="flex xl:gap-60 lg:gap-32 gap-20 max-md:flex-col-reverse">
         <motion.div className="relative w-[50%] flex items-center max-md:w-full">
           <motion.span
@@ -169,14 +169,13 @@ const Home = () => {
             initial={{ x: -100, opacity: 0 }}
             whileInView={{ x: 0, opacity: 1 }}
             transition={springTransition}
-            className="w-[40%] max-md:w-full flex items-center"
+            className="w-[40%] max-md:w-full"
           >
             <ImageBlur
               src={LandingIll.AboutSvg}
               alt="grouping transaction"
               width={400}
               height={500}
-              className="max-md:w-[80%]  "
             />
           </motion.div>
           <motion.div

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { startCamera } from "@/lib/utils/camera";
 import { motion } from "framer-motion";
 import { Loader2, Camera, Check } from "lucide-react";
 import type React from "react";
@@ -54,7 +53,6 @@ export const PreloadStep: React.FC<PreloadStepProps> = ({
           camera: { loading: true, complete: false },
         }));
 
-        await startCamera();
         setLoadingStates((prev) => ({
           ...prev,
           camera: { loading: false, complete: true },

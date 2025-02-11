@@ -1,26 +1,22 @@
 "use client";
 import { useCallback, useState } from "react";
 import { FaIdCard } from "react-icons/fa";
-import ImageBlur from "@/components/common/ImageBlur";
 import { DocumentCapture } from "./DocumentCapture";
-import { UseUserInfo } from "@/hooks/useUserInfo";
 import { motion, AnimatePresence } from "framer-motion";
+import { UseUserInfo } from "@/hooks/useUserInfo";
+import ImageBlur from "@/components/common/ImageBlur";
 interface DocumentStepProps {
   step: Step;
   images: { [key in Step]?: string };
   onComplete: (image: string) => void;
-  setErr: (err: string | null) => void;
   updateStep: (step: Step) => void;
-  err: string | null;
 }
 
 export const DocumentStep: React.FC<DocumentStepProps> = ({
   step,
   images,
   onComplete,
-  setErr,
   updateStep,
-  err,
 }) => {
   const [documentStage, setDocumentStage] = useState<Step | "submit" | "">("");
 
@@ -37,9 +33,8 @@ export const DocumentStep: React.FC<DocumentStepProps> = ({
       <DocumentCapture
         type={step}
         onCapture={handleCapture}
-        setErr={setErr}
         onCancel={() => updateStep("document")}
-        err={err}
+        selfieImage={images.selfie! || ""}
       />
     );
   }

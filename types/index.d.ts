@@ -1,22 +1,16 @@
-interface FormInfo {
-  name: string;
-  email: string;
-  phoneNumber: string;
+ type Step = "preload" | "selfie" | "document" | "front" | "back" | "complete"
+
+ interface VerificationStep {
+  id: Step
+  title: string
+  description: string
+  status: "pending" | "processing" | "complete"
 }
 
-type Step = "preload" | "selfie" | "document" | "front" | "back" | "complete";
-
-interface VerificationStep {
-  id: Step;
-  title: string;
-  description: string;
-  status: "pending" | "processing" | "complete" | "failed";
-}
-
-interface FaceDetectionCaseType {
-faceDetected: boolean
+ interface FaceDetectionCaseType {
+  faceDetected: boolean
   multipleFaces: boolean
-  facePositioning?: {
+  facePositioning: {
     x: number
     y: number
     width: number
@@ -35,13 +29,6 @@ faceDetected: boolean
   faceAngleValid: boolean
 }
 
-interface ValidationResult {
-  confidence: number;
-  errors?: string[];
-  isValid: boolean;
-}
-
-
  interface ExtractedCardInfo {
   cardType: string
   isFront: boolean
@@ -54,5 +41,39 @@ interface ValidationResult {
   nationality?: string
   dateOfIssue?: string
   dateOfExpiry?: string
+  personalIdNumber?: string
+  policyNumber?: string
+  licenseNumber?: string
   additionalInfo: Record<string, string>
 }
+
+ interface FaceValidationResult {
+  isValid: boolean
+  message: string
+}
+
+ interface DetectedTextItem {
+  DetectedText: string
+  Type: string
+  Id: number
+  ParentId?: number
+  Confidence: number
+  Geometry: {
+    BoundingBox: {
+      Width: number
+      Height: number
+      Left: number
+      Top: number
+    }
+    Polygon: Array<{ X: number; Y: number }>
+  }
+}
+
+ interface DocumentValidationResult {
+  isValid: boolean
+  confidence: number
+  errors: string[]
+  extractedData: ExtractedCardInfo
+  rawText: string
+}
+

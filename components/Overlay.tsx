@@ -15,7 +15,7 @@ interface OverlayProps {
   stage?: "face" | "leftRight" | "blink";
   blinkCount?: number;
   centerFaceDetected?: boolean;
-  leftFaceDetected?: boolean
+  leftFaceDetected?: boolean;
   rightFaceDetected?: boolean;
   faceAngle?: number;
 }

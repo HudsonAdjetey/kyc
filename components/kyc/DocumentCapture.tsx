@@ -1,146 +1,184 @@
 "use client";
 import type React from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
-import { validateDocument } from "@/lib/utils/index";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, CameraOff, CheckCircle, X } from "lucide-react";
+import {
+  Camera,
+  CameraOff,
+  CheckCircle,
+  X,
+  Loader2,
+  CreditCard,
+  AlertCircle,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "../ui/alert";
+
+type IdType = "passport" | "driverLicense" | "nationalId";
+
 interface DocumentCaptureProps {
   type: "front" | "back";
   onCapture: (image: string) => void;
-  setErr: (err: string | null) => void;
   onCancel: () => void;
-  err: string | null;
+  selfieImage: string;
 }
 
 export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
   type,
   onCapture,
-  setErr,
   onCancel,
-  err,
+  selfieImage,
 }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [selectedIdType, setSelectedIdType] = useState<IdType>("nationalId");
   const webCamRef = useRef<Webcam>(null);
+  const [err, setError] = useState<string>("");
+
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (err) {
+      setIsVisible(true);
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+        setTimeout(() => setError(""), 300);
+      }, 400);
+
+      return () => clearTimeout(timer);
+    }
+  }, [err, setError]);
 
   const initializeCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          aspectRatio: { ideal: 1.7777 },
-        },
+        video: { width: 1280, height: 720, aspectRatio: 1.7777 },
       });
 
       setStream(mediaStream);
-
-      if (webCamRef.current?.video) {
-        webCamRef.current.video.srcObject = mediaStream;
-
-        webCamRef.current.video.onloadedmetadata = () => {
-          webCamRef.current?.video?.play();
-        };
-      }
+      setError("");
     } catch (error) {
       console.error("Camera Access Error:", error);
-      setErr(
+      setError(
         error instanceof DOMException
           ? `Camera Error: ${error.message}`
           : "Unable to access camera"
       );
     }
-  }, [setErr]);
+  }, [setError]);
 
   const stopCamera = useCallback(() => {
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
       setStream(null);
     }
-  }, [stream, setStream]);
+  }, [stream]);
+
+  const uploadImage = useCallback(
+    async (imageData: string) => {
+      setUploading(true);
+      try {
+        const response = await fetch("/api/verify-document", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            idImage: imageData,
+            idType: selectedIdType,
+            selfieImage: selfieImage,
+            stage: type,
+          }),
+        });
+
+        const result = await response.json();
+        console.log(result);
+        if (!response.ok) {
+          console.log(result.message || "Upload failed");
+          return;
+        }
+        onCapture(result.imageData);
+        setError("");
+      } catch (error) {
+        console.error(error);
+        setError(error instanceof Error ? error.message : "Upload failed");
+      } finally {
+        setUploading(false);
+        stopCamera();
+      }
+    },
+    [selectedIdType, selfieImage, type, onCapture, setError, stopCamera]
+  );
 
   const captureImage = useCallback(async () => {
     if (!webCamRef.current) return;
     setProcessing(true);
-    setErr(null);
+    setError("");
 
     try {
       const imageData = webCamRef.current.getScreenshot();
       if (!imageData) throw new Error("Failed to capture image");
 
-      const validation = await validateDocument(imageData);
-      if (!validation.isValid)
-        throw new Error(validation.errors?.[0] || "Invalid Document");
-
-      onCapture(imageData);
+      await uploadImage(imageData);
     } catch (error) {
-      setErr(error instanceof Error ? error.message : "Capture failed");
+      setError(error instanceof Error ? error.message : "Capture failed");
     } finally {
       setProcessing(false);
-      if (stream) {
-        stopCamera();
-      }
     }
-  }, [onCapture, setErr, stopCamera, stream]);
+  }, [setError, uploadImage]);
 
-  /* useEffect(() => {
-    const preloadResources = async () => {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        await initializeCamera();
-      } catch (error) {
-        setErr(
-          error instanceof Error
-            ? error.message
-            : "Failed to initialize resources. Please try again"
-        );
-      }
-    };
-
-    preloadResources();
-    if (stream == null) {
-      stopCamera();
+  const getIdTypeLabel = (idType: IdType): string => {
+    switch (idType) {
+      case "passport":
+        return "Passport";
+      case "driverLicense":
+        return "Driver's License";
+      case "nationalId":
+        return "National ID";
     }
-  }, [initializeCamera, setErr]); */
-
-  // performing a loading state
-  if (processing) {
-    return (
-      <div className="w-full h-[500px] flex items-center justify-center bg-gray-50 rounded-lg">
-        <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="mb-4"
-          >
-            <Camera className="w-12 h-12 text-orange-500 mx-auto" />
-          </motion.div>
-          <p className="text-gray-600">Processing document...</p>
-        </div>
-      </div>
-    );
-  }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-gray-500 mb-2">
-          <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <span className="bg-orange-500 text-white px-4 py-1.5 rounded-full text-sm font-medium">
             Step {type === "front" ? "4" : "5"} of 5
           </span>
+          <Select
+            value={selectedIdType}
+            onValueChange={(value: IdType) => setSelectedIdType(value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select ID Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="passport">Passport</SelectItem>
+              <SelectItem value="driverLicense">
+                Driver&apos;s License
+              </SelectItem>
+              <SelectItem value="nationalId">National ID</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <h1 className="text-2xl font-semibold text-gray-900">
-          Scan {type === "front" ? "Front" : "Back"} of ID
+          Scan {type === "front" ? "Front" : "Back"} of{" "}
+          {getIdTypeLabel(selectedIdType)}
         </h1>
         <p className="text-gray-600 mt-2">
-          Position your ID card within the frame and ensure it&apos;s clearly
-          visible
+          Position your {getIdTypeLabel(selectedIdType).toLowerCase()} within
+          the frame and ensure all text is clearly visible.
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-        <div className="relative aspect-[4/3] max-w-2xl mx-auto overflow-hidden rounded-lg">
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+        <div className="relative aspect-[4/3] max-w-2xl mx-auto overflow-hidden rounded-xl">
           <AnimatePresence mode="wait">
             {stream ? (
               <motion.div
@@ -160,64 +198,7 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
                   }}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-
-                {/* Overlay for document scanning */}
-                <motion.div
-                  className="absolute inset-0 pointer-events-none"
-                  initial={false}
-                >
-                  <div className="absolute inset-[4%]  border-2 border-dashed border-white/70">
-                    <motion.div
-                      className="absolute inset-0 border border-green-500/50"
-                      animate={{
-                        opacity: [0.3, 0.6, 0.3],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                    />
-
-                    {/* markers */}
-                    {[
-                      "top-0 left-0",
-                      "top-0 right-0",
-                      "bottom-0 left-0",
-                      "bottom-0 right-0",
-                    ].map((position) => (
-                      <motion.div
-                        key={position}
-                        className={`absolute  w-6 h-6 ${position}`}
-                        initial={false}
-                        animate={{
-                          opacity: [1, 0.5, 1],
-                        }}
-                        transition={{
-                          duration: 1.5,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }}
-                      >
-                        <div
-                          className="absolute inset-0 border-2 border-green-500"
-                          style={{
-                            borderLeftWidth: position.includes("left") ? 4 : 0,
-                            borderRightWidth: position.includes("right")
-                              ? 4
-                              : 0,
-                            borderTopWidth: position.includes("top") ? 4 : 0,
-                            borderBottomWidth: position.includes("bottom")
-                              ? 4
-                              : 0,
-                          }}
-                        />
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* Guidance text */}
-                </motion.div>
+                <div className="absolute inset-0 border-4 border-orange-500 rounded-lg opacity-50" />
               </motion.div>
             ) : (
               <motion.div
@@ -225,12 +206,15 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="w-full h-full bg-gray-50 flex items-center justify-center"
+                className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl border-2 border-dashed border-gray-200"
               >
-                <div className="text-center">
-                  <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">
-                    {err || `Ready to scan ${type} of ID`}
+                <div className="text-center p-6">
+                  <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 font-medium">
+                    {err || `Ready to scan ${getIdTypeLabel(selectedIdType)}`}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Use good lighting and avoid glare
                   </p>
                 </div>
               </motion.div>
@@ -238,23 +222,25 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
           </AnimatePresence>
         </div>
 
+        {err && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg">
+            <p className="text-center text-red-600 text-sm">{err}</p>
+          </div>
+        )}
+
         <div className="mt-8 flex max-md:flex-col justify-center gap-4">
           <button
             onClick={stream ? stopCamera : initializeCamera}
-            disabled={processing}
-            className="px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 transition-colors
-                     bg-white border border-gray-200 hover:bg-gray-50 text-gray-700
-                     disabled:bg-gray-100 disabled:text-gray-400"
+            disabled={processing || uploading}
+            className="px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 transition-colors bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
           >
             {stream ? (
               <>
-                <CameraOff className="w-4 h-4" />
-                Cancel
+                <CameraOff className="w-4 h-4" /> Stop Camera
               </>
             ) : (
               <>
-                <Camera className="w-4 h-4" />
-                Start Camera
+                <Camera className="w-4 h-4" /> Start Camera
               </>
             )}
           </button>
@@ -262,13 +248,19 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
           {stream && (
             <button
               onClick={captureImage}
-              disabled={processing}
-              className="px-6 py-3 rounded-lg font-medium flex  justify-center items-center gap-2
-                       bg-orange-500 text-white hover:bg-orange-400 transition-colors
-                       disabled:bg-orange-200"
+              disabled={processing || uploading}
+              className="px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:bg-orange-300 disabled:cursor-not-allowed"
             >
-              <CheckCircle className="w-4 h-4" />
-              Capture
+              {processing || uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {processing ? "Processing..." : "Uploading..."}
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" /> Capture
+                </>
+              )}
             </button>
           )}
 
@@ -277,18 +269,47 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
               stopCamera();
               onCancel();
             }}
-            className="px-6 py-3 justify-center rounded-lg font-medium flex items-center gap-2
-                     bg-white border border-gray-200 hover:bg-gray-50 text-gray-700"
+            className="px-6 py-3 justify-center rounded-lg font-medium flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700"
           >
-            <X className="w-4 h-4" />
-            Back
+            <X className="w-4 h-4" /> Back
           </button>
         </div>
+        <AnimatePresence>
+          {isVisible && err && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4"
+            >
+              <Alert
+                variant="destructive"
+                className="flex items-center gap-2 shadow-lg"
+              >
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm font-medium">
+                  {err}
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <p className="text-xs text-gray-500 text-center mt-6">
-          Make sure all text on your ID is clearly visible and glare-free
-        </p>
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">
+            Tips for best results:
+          </h3>
+          <ul className="text-xs text-gray-600 space-y-1">
+            <li>• Ensure all text is clearly visible and glare-free</li>
+            <li>• Place the document against a dark background</li>
+            <li>• Make sure all corners are visible in the frame</li>
+            <li>• Hold the camera steady when capturing</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
 };
+
+export default DocumentCapture;

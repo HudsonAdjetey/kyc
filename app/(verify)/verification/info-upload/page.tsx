@@ -1,9 +1,9 @@
 "use client";
 
-import { CompleteStep } from "@/components/kyc/CompleteStep";
+import CompleteStep from "@/components/kyc/CompleteStep";
 import { DocumentStep } from "@/components/kyc/DocumentStep";
 import { PreloadStep } from "@/components/kyc/PreloadStep";
-import { SelfieStep } from "@/components/kyc/SelfieStep";
+import SelfieStep from "@/components/kyc/SelfieStep";
 import { useEffect, useState } from "react";
 
 const KycVerification = () => {
@@ -84,12 +84,11 @@ const KycVerification = () => {
       case "selfie":
         return (
           <SelfieStep
-            onComplete={(image) => {
+            onComplete={(image: string) => {
               setImages((prev) => ({ ...prev, selfie: image }));
               completeStep("selfie");
             }}
             setStep={() => setStep("document")}
-            image={images.selfie || ""}
           />
         );
       case "document":
@@ -99,13 +98,11 @@ const KycVerification = () => {
           <DocumentStep
             step={step}
             images={images}
-            onComplete={(image) => {
+            onComplete={(image: string) => {
               setImages((prev) => ({ ...prev, [step]: image }));
               completeStep(step);
               updateStep(step === "back" ? "complete" : "back");
             }}
-            err={err}
-            setErr={setErr}
             updateStep={updateStep}
           />
         );

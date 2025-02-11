@@ -7,12 +7,21 @@ import Link from "next/link";
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Navigation links data - easier to maintain and update
   const mainNavLinks = [
     { href: "/verification", label: "Verification" },
     { href: "/customer-support", label: "Customer Support" },
   ];
 
-  
+  const mobileNavLinks = [
+    ...mainNavLinks,
+    { href: "/logout", label: "Logout" },
+    { href: "/profile", label: "Profile" },
+    { href: "/settings", label: "Settings" },
+    { href: "/help", label: "Help" },
+    { href: "/terms-and-conditions", label: "Terms & Conditions" },
+    { href: "/privacy-policy", label: "Privacy Policy" },
+  ];
 
   useEffect(() => {
     const handleEscapeKey = (event: KeyboardEvent) => {
@@ -114,7 +123,7 @@ const Header = () => {
               <X size={24} />
             </button>
             <ul className="p-4 space-y-4">
-              {mainNavLinks.map(({ href, label }) => (
+              {mobileNavLinks.map(({ href, label }) => (
                 <li key={href}>
                   <Link
                     href={href}

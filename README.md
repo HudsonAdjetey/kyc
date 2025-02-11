@@ -1,60 +1,36 @@
-# KYC (Know Your Customer) Verification System
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-This repository contains the codebase for a KYC (Know Your Customer) system designed to automate document and identity verification processes. The project integrates OCR (Optical Character Recognition) using Tesseract.js and face detection functionality via Face API. While functional, the system has some limitations and security vulnerabilities that need addressing.
+## Getting Started
 
----
+First, run the development server:
 
-## 🚀 Features
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-- **Document Verification**:  
-  Utilizes Tesseract.js for OCR to extract text data from uploaded documents.  
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-- **Face Matching**:  
-  Compares the user's uploaded photo with their ID document using Face API.  
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-- **User Management Pages**:  
-  Includes a series of front-end pages for user interaction and KYC submission.  
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
----
+## Learn More
 
-## ⚠️ Current Limitations and Vulnerabilities
+To learn more about Next.js, take a look at the following resources:
 
-### OCR (Tesseract.js) for Document Validation  
-- The current implementation captures text data but lacks advanced logic for data validation and accuracy.  
-- It may not handle edge cases like varying document layouts, fonts, or degraded image quality effectively.  
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-### Security Vulnerabilities with Face API  
-- **Vulnerability Threats**: There are **3 severe vulnerabilities** in the Face API integration that could expose sensitive user data or compromise system integrity.  
-- **Immediate Attention Needed**: These issues need mitigation to ensure the security and privacy of user information.  
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-### Development in Progress  
-- Additional pages and functionality are actively being added to improve usability and system capabilities.  
+## Deploy on Vercel
 
----
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-## 📸 Screenshots of the Pages
-
-### 1. Home Page  
-The landing page where users are introduced to the KYC system.  
-![Home Page](./screenshots/Screenshot-2025-01-26-172801.png)
-
-### 2. Document Upload Page  
-The page where users upload their ID documents for OCR processing.  
-![Document Upload Page](./screenshots/Screenshot-2025-01-26-173025.png)
-
-### 3. Face Verification Page  
-This page allows users to upload their photo for comparison with their ID document.  
-![Face Verification Page](./screenshots/Screenshot-2025-01-26-173131.png)
-
----
-
-## 🚧 Development Roadmap
-
-- **Enhanced OCR Logic**:  
-  Develop improved algorithms to handle document layout variability and ensure accurate data capture.  
-
-- **Security Improvements**:  
-  Address the existing vulnerabilities in the Face API integration to enhance user data protection.  
-
-- **Feature Expansion**:  
-  Add functionalities such as real-time error handling, robust backend integration, and user feedback mechanisms.  
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

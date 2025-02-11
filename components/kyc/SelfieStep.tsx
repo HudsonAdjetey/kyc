@@ -1,406 +1,491 @@
 "use client";
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import Webcam from "react-webcam";
-import { FaCheckSquare } from "react-icons/fa";
-import { detectFace, startCamera } from "@/lib/utils/index";
-import Image from "next/image";
-import { AlertCircle } from "lucide-react";
-import { FaCamera } from "react-icons/fa6";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+} from "react";
+import { AlertCircle, ArrowLeft, Camera, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 
-interface SelfieStepProps {
-  onComplete: (image: string) => void;
-  setStep: () => void;
-  image: string;
+interface VerificationStep {
+  id: string;
+  title: string;
+  instruction: string;
+  completed: boolean;
 }
 
-export const SelfieStep: React.FC<SelfieStepProps> = ({
-  onComplete,
-  setStep,
-  image,
-}) => {
-  const [faceStage, setFaceStage] = useState<"face" | "leftRight" | "blink">(
-    "face"
+interface CaptureResult {
+  imageData: string;
+  typeImage: string;
+  verified: boolean;
+}
+
+interface SelfieStepProps {
+  onComplete: (imageData: string) => void;
+  setStep: () => void;
+}
+
+const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [results, setResults] = useState<CaptureResult[]>([]); // Remove initial empty result
+  const [error, setError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [progress, setProgress] = useState<number>(0);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isAllverified, setAllIsVerifed] = useState<boolean>(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const steps: VerificationStep[] = useMemo(
+    () => [
+      {
+        id: "face",
+        title: "Face Detection",
+        instruction:
+          "Position your face within the frame and look straight ahead",
+        completed: false,
+      },
+      {
+        id: "left",
+        title: "Left Side",
+        instruction: "Turn your head slightly to the left",
+        completed: false,
+      },
+      {
+        id: "right",
+        title: "Right Side",
+        instruction: "Turn your head slightly to the right",
+        completed: false,
+      },
+      {
+        id: "blink",
+        title: "Blink Detection",
+        instruction: "Blink naturally a few times",
+        completed: false,
+      },
+    ],
+    []
   );
-  const [validFace, setValidFace] = useState(false);
-  const [leftFaceDetected, setLeftFaceDetected] = useState(false);
-  const [rightFaceDetected, setRightFaceDetected] = useState(false);
-  const [leftRightCompleted, setLeftRightCompleted] = useState(false);
-  const [blinkCompleted, setBlinkCompleted] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [blinkCount, setBlinkCount] = useState(0);
-  const [lastBlinkTime, setLastBlinkTime] = useState(0);
-  const [consecutiveBlinkFrames, setConsecutiveBlinkFrames] = useState(0);
-  const [leftTurnStartTime, setLeftTurnStartTime] = useState(0);
-  const [rightTurnStartTime, setRightTurnStartTime] = useState(0);
-  const [captured, setCaptured] = useState(false);
-  const [detectionError, setDetectionError] = useState<string | null>(null);
-  const [err, setErrState] = useState<string | null>(null);
-  const webCamRef = useRef<Webcam>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
-  const captureImage = useCallback(async () => {
-    if (!webCamRef.current) return;
-    const imageData = webCamRef.current.getScreenshot();
-    if (!imageData) throw new Error("Failed to capture image");
-    onComplete(imageData);
-  }, [onComplete]);
+  // Add progress calculation effect
+  useEffect(() => {
+    const verifiedSteps = steps.filter((step) =>
+      results.some((result) => result.typeImage === step.id && result.verified)
+    ).length;
+    const newProgress = (verifiedSteps / steps.length) * 100;
+    setProgress(newProgress);
+  }, [results, steps]);
 
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        track.stop();
-      });
-      streamRef.current = null;
-      setStream(null);
+  const toggleFullScreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        setIsFullScreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullScreen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Fullscreen mode is not supported on this device");
     }
   }, []);
 
-  const initializeCamera = useCallback(async () => {
+  const startCamera = useCallback(async () => {
     try {
-      const mediaStream = await startCamera();
-      streamRef.current = mediaStream;
-      setStream(mediaStream);
-    } catch (error) {
-      setErrState(
-        error instanceof Error ? error.message : "Failed to start camera"
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream)
+          .getTracks()
+          .forEach((track) => track.stop());
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user",
+        },
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setIsCapturing(true);
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError(
+        "Unable to access camera. Please ensure you have granted permissions."
       );
     }
-  }, [setErrState]);
+  }, []);
 
-  useEffect(() => {
-    if (!captured) {
-      initializeCamera();
+  const stopCamera = useCallback(() => {
+    if (videoRef.current?.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach((track) => track.stop());
+      setIsCapturing(false);
     }
-    return () => {
-      stopCamera();
-    };
-  }, [initializeCamera, stopCamera, captured]);
+  }, []);
 
-  useEffect(() => {
-    if (!webCamRef.current || !stream || captured) return;
+  const captureImage = useCallback(() => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext("2d");
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+        return canvasRef.current.toDataURL("image/jpeg");
+      }
+    }
+    return null;
+  }, []);
 
-    let isMounted = true;
-    let failedDetectionCount = 0;
-    const MAX_FAILED_DETECTIONS = 10;
+  const verifyImage = useCallback(
+    async (imageData: string) => {
+      try {
+        const response = await fetch("/api/verify-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image: imageData,
+            step: steps[currentStep].id,
+          }),
+        });
 
-    const interval = setInterval(async () => {
-      if (!webCamRef.current || !webCamRef.current.video) {
-        console.log("Webcam or video element is not available");
-        setErrState("Camera is not ready. Please wait or refresh the page.");
+        if (!response.ok) {
+          setError("Verification failed");
+          console.log(response);
+          throw new Error("Verification failed");
+        }
+
+        const result = await response.json();
+        return result.verified;
+      } catch (err) {
+        console.log(err);
+        setError("Verification failed. Please try again.");
+        return false;
+      }
+    },
+    [currentStep, steps]
+  );
+
+  const handleCapture = async () => {
+    const imageData = captureImage();
+
+    if (!imageData) {
+      setError("Failed to capture image. Please try again.");
+      return;
+    }
+    setIsProcessing(true);
+
+    try {
+      const verified = await verifyImage(imageData);
+      if (!verified) {
+        setIsProcessing(false);
         return;
       }
 
-      try {
-        const result = await detectFace(webCamRef?.current?.video);
-        if (!isMounted) return;
+      setResults((prev) => [
+        ...prev,
+        { typeImage: steps[currentStep].id, verified, imageData },
+      ]);
 
-        if (result.faceDetected) {
-          failedDetectionCount = 0;
-          setDetectionError(null);
-
-          const currentTime = Date.now();
-
-          if (result.faceWithinValidArea) {
-            if (result.centerFaceValid) {
-              setValidFace(true);
-              if (faceStage === "face") {
-                setFaceStage("leftRight");
-              }
-            } else {
-              setValidFace(false);
-              if (result.horizontalOffsetPercentage > 15) {
-                setErrState(
-                  result.horizontalOffsetPercentage > 0
-                    ? "Move slightly left"
-                    : "Move slightly right"
-                );
-              } else if (result.verticalOffsetPercentage > 15) {
-                setErrState(
-                  result.verticalOffsetPercentage > 0
-                    ? "Move slightly up"
-                    : "Move slightly down"
-                );
-              } else {
-                setErrState("Keep your face centered");
-              }
-            }
-          } else {
-            setValidFace(false);
-            setErrState("Move closer to the center");
-          }
-
-          if (validFace && faceStage === "leftRight") {
-            if (!leftFaceDetected && result.leftFaceValid) {
-              if (!leftTurnStartTime) {
-                setLeftTurnStartTime(currentTime);
-              } else if (currentTime - leftTurnStartTime >= 1000) {
-                setLeftFaceDetected(true);
-              }
-            } else if (!result.leftFaceValid && !leftFaceDetected) {
-              setLeftTurnStartTime(0);
-            }
-
-            if (!rightFaceDetected && result.rightFaceValid) {
-              if (!rightTurnStartTime) {
-                setRightTurnStartTime(currentTime);
-              } else if (currentTime - rightTurnStartTime >= 1000) {
-                setRightFaceDetected(true);
-              }
-            } else if (!result.rightFaceValid && !rightFaceDetected) {
-              setRightTurnStartTime(0);
-            }
-
-            if (leftFaceDetected && rightFaceDetected) {
-              setLeftRightCompleted(true);
-              setFaceStage("blink");
-            }
-          }
-
-          if (validFace && leftRightCompleted && faceStage === "blink") {
-            if (result.blinkConfidence > 0.8) {
-              setConsecutiveBlinkFrames((prev) => prev + 1);
-              if (
-                consecutiveBlinkFrames >= 3 &&
-                currentTime - lastBlinkTime > 500
-              ) {
-                setBlinkCount((prev) => prev + 1);
-                setLastBlinkTime(currentTime);
-                setConsecutiveBlinkFrames(0);
-              }
-            } else {
-              setConsecutiveBlinkFrames(0);
-            }
-
-            if (blinkCount >= 2) {
-              setBlinkCompleted(true);
-            }
-          }
-
-          if (!captured && validFace && leftRightCompleted && blinkCompleted) {
-            clearInterval(interval);
-            setCaptured(true);
-            await captureImage();
-            stopCamera();
-          }
-
-          setErrState(null);
-        } else {
-          failedDetectionCount++;
-          if (failedDetectionCount >= MAX_FAILED_DETECTIONS) {
-            setDetectionError(
-              "Face detection is struggling. Please check your lighting and camera position."
-            );
-          }
-          setValidFace(false);
-          setErrState("No face detected. Please ensure your face is visible.");
-        }
-      } catch (error) {
-        console.log("Face detection error:", error);
-        setErrState(
-          "Failed to detect face. Please ensure your face is visible and try again."
-        );
+      if (currentStep < steps.length - 1) {
+        setCurrentStep((prev) => prev + 1);
+      } else {
+        stopCamera();
       }
-    }, 100);
+    } catch (error) {
+      console.log(error);
+      setError("Verification failed. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (steps[currentStep].id !== "blink") return;
+
+    let isMounted = true;
+
+    const handleBlinkDetection = async () => {
+      while (isMounted) {
+        const imageData = captureImage();
+
+        if (!imageData) {
+          setError("Failed to capture image. Please try again.");
+          break;
+        }
+
+        try {
+          const isVerified = await verifyImage(imageData);
+
+          if (isVerified) {
+            setResults((prev) => [
+              ...prev,
+              { typeImage: "blink", imageData, verified: true },
+            ]);
+            setError(null);
+            setIsProcessing(false);
+            break;
+          }
+        } catch (error) {
+          console.error("Blink verification error:", error);
+          setError(
+            "Verification failed. Please ensure good lighting and face visibility."
+          );
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    };
+
+    handleBlinkDetection();
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
-  }, [
-    stream,
-    captured,
-    validFace,
-    faceStage,
-    leftFaceDetected,
-    rightFaceDetected,
-    leftRightCompleted,
-    blinkCompleted,
-    blinkCount,
-    lastBlinkTime,
-    consecutiveBlinkFrames,
-    leftTurnStartTime,
-    rightTurnStartTime,
-    captureImage,
-    stopCamera,
-    setErrState,
-  ]);
+  }, [steps, currentStep, captureImage, verifyImage]);
 
   useEffect(() => {
-    const blinkResetTimeout = setTimeout(() => {
-      if (Date.now() - lastBlinkTime > 3000) {
-        setBlinkCount(0);
-      }
-    }, 3000);
+    if (isAllverified) return;
 
-    return () => clearTimeout(blinkResetTimeout);
-  }, [lastBlinkTime]);
+    const isVerificationComplete = steps.every((step) =>
+      results.some((result) => result.typeImage === step.id && result.verified)
+    );
+    const faceResult = results.find((result) => result.typeImage === "face");
+
+    if (isVerificationComplete && faceResult) {
+      setAllIsVerifed(true);
+      setError(null);
+      setIsProcessing(false);
+      onComplete(faceResult.imageData);
+    }
+  }, [results, onComplete, setStep, steps.length, isAllverified, steps]);
 
   return (
-    <div className="w-full  mx-auto px-2  py-6">
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-gray-500 mb-2">
-          <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-            Step 2 of 5
-          </span>
+    <div className="min-h-screen w-full bg-gradient-to-b from-gray-50 to-gray-100">
+      <div className="h-full flex flex-col">
+        {/* Header Section */}
+        <div className="p-4 bg-white/90 shadow-sm">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                onClick={() => {}}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  Step 2 of 5
+                </span>
+                <h1 className="text-xl font-semibold text-gray-900 mt-1">
+                  Identity Verification
+                </h1>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleFullScreen}
+              className="text-gray-500"
+            >
+              {isFullScreen ? (
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 9h6v6H9z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0 0l-5-5m-7 11h4m-4 0v4m0-4l5 5m11-5h-4m4 0v4m0-4l-5 5"
+                  />
+                </svg>
+              )}
+            </Button>
+          </div>
         </div>
-        <h1 className="text-2xl font-semibold text-gray-900">
-          Identity Verification
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Please take a clear photo of your face
-        </p>
-      </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-        {/* Camera Section */}
-        <div className="relative  max-w-3xl mx-auto">
-          {/* Status Overlay */}
-          {!captured && (
-            <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-10">
-              <div className="bg-gray-900/90 backdrop-blur text-white px-4 py-2 rounded-lg text-sm text-center min-w-[200px]">
-                {detectionError ? (
-                  <p className="text-red-400 animate-pulse">{detectionError}</p>
-                ) : (
-                  <>
-                    {!validFace && (
-                      <p>{err || "Position your face within the frame"}</p>
-                    )}
-                    {faceStage === "leftRight" && (
-                      <div>
-                        <p>Turn head slowly left and right</p>
-                        <div className="flex justify-center gap-4 mt-2">
-                          <span
-                            className={`transition-colors duration-300 ${
-                              leftFaceDetected
-                                ? "text-green-400"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            Left ✓
-                          </span>
-                          <span
-                            className={`transition-colors duration-300 ${
-                              rightFaceDetected
-                                ? "text-green-400"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            Right ✓
-                          </span>
-                        </div>
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto p-4">
+            {/* Progress Steps */}
+            <div className="grid grid-cols-4 gap-2 mb-6">
+              {steps.map((step, idx) => (
+                <div
+                  key={step.id}
+                  className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+                    idx === currentStep
+                      ? "bg-orange-50 border-2 border-orange-200 shadow-sm"
+                      : idx < currentStep
+                      ? "bg-green-50 border border-green-200"
+                      : "bg-gray-50 border border-gray-200"
+                  }`}
+                >
+                  <div
+                    className={`rounded-full p-1 ${
+                      idx === currentStep
+                        ? "text-orange-500"
+                        : idx < currentStep
+                        ? "text-green-500"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {idx < currentStep ? (
+                      <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5" />
+                    ) : (
+                      <div className="h-4 w-4 md:h-5 md:w-5 rounded-full border-2 flex items-center justify-center text-xs">
+                        {idx + 1}
                       </div>
                     )}
-                    {faceStage === "blink" && !blinkCompleted && (
-                      <p>Blink naturally a few times</p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-          {/* Guidelines */}
-          <div className="max-w-2xl mx-auto  my-8">
-            <div className="xl:flex items-start gap-3 hidden  text-gray-600 text-sm">
-              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
-              <div>
-                <p className="font-medium text-gray-900 mb-2">
-                  Important Guidelines:
-                </p>
-                <ul className="space-y-2">
-                  <li>• Ensure your face is well-lit and clearly visible</li>
-                  <li>• Remove any sunglasses or face coverings</li>
-                  <li>• Keep a neutral expression and look straight ahead</li>
-                  <li>• Use a plain background if possible</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Camera Container */}
-          <div className="aspect-[5/5] max-w-xl mx-auto relative rounded-xl overflow-hidden border-2 border-gray-200">
-            <div
-              className={`absolute inset-0 border-2 ${
-                validFace ? "border-green-500" : "border-gray-300"
-              } rounded-xl transition-colors duration-300`}
-            />
-
-            {stream ? (
-              <Webcam
-                ref={webCamRef}
-                audio={false}
-                screenshotFormat="image/png"
-                videoConstraints={{
-                  facingMode: "user",
-                  width: { min: 720, ideal: 1280 },
-                  height: { min: 720, ideal: 1280 },
-                  aspectRatio: 0.8,
-                }}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full bg-gray-50">
-                {image ? (
-                  <Image
-                    width={720}
-                    height={900}
-                    alt="profile"
-                    src={image || "/placeholder.svg"}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="text-center">
-                    <FaCamera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">Camera not initialized</p>
                   </div>
+                  <span className="text-xs mt-1 text-center font-medium hidden md:block">
+                    {step.title}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Camera View */}
+            <div className="relative aspect-[3/4] mx-auto sm:max-w-3xl md:aspect-video bg-black rounded-xl overflow-hidden shadow-lg mb-4">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+
+              {!isCapturing && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/70 backdrop-blur-sm">
+                  <Button
+                    onClick={startCamera}
+                    size="lg"
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 shadow-lg"
+                  >
+                    <Camera className="h-5 w-5" />
+                    Start Camera
+                  </Button>
+                  <p className="text-white/90 text-sm mt-4 max-w-md text-center px-4">
+                    We&apos;ll guide you through a quick verification process
+                  </p>
+                </div>
+              )}
+
+              {isCapturing && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-[60%] h-[80%] border-2 border-white rounded-full opacity-50 animate-pulse" />
+                </div>
+              )}
+            </div>
+
+            {/* Instructions and Errors */}
+            <div className="space-y-4">
+              {isCapturing && (
+                <Alert className="bg-orange-50 border-orange-200">
+                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                  <AlertDescription className="text-orange-700 ml-2">
+                    {steps[currentStep].instruction}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {error && (
+                <Alert
+                  variant="destructive"
+                  className="bg-red-50 border-red-200 animate-shake"
+                >
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  <AlertDescription className="text-red-700 ml-2">
+                    {error}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Progress */}
+              <div className="space-y-2">
+                <Progress value={progress} className="h-2 bg-gray-100" />
+                <p className="text-sm text-gray-500 text-right">
+                  {progress}% complete
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-between gap-4 sticky bottom-4">
+                {isCapturing &&
+                  steps[currentStep].id !== "blink" &&
+                  !isAllverified && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={stopCamera}
+                        className="w-1/2 py-7"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleCapture}
+                        disabled={isProcessing}
+                        className="w-1/2 py-7 bg-orange-500 hover:bg-orange-600"
+                      >
+                        {isProcessing ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                            Processing...
+                          </div>
+                        ) : (
+                          "Capture Image"
+                        )}
+                      </Button>
+                    </>
+                  )}
+                {isAllverified && (
+                  <Button
+                    onClick={setStep}
+                    className="w-full py-7 bg-green-500 hover:bg-green-600"
+                  >
+                    Continue to Next Step
+                  </Button>
                 )}
               </div>
-            )}
+
+              <p className="text-xs text-gray-500 text-center pb-4">
+                Your photos are encrypted and will only be used for verification
+              </p>
+            </div>
           </div>
-
-          {/* Progress Indicators */}
-          <div className="mt-8 grid grid-cols-3 gap-4 max-w-lg mx-auto">
-            {[
-              { label: "Face Detected", completed: validFace },
-              { label: "Movement Check", completed: leftRightCompleted },
-              { label: "Liveness Check", completed: blinkCompleted },
-            ].map((status) => (
-              <div
-                key={status.label}
-                className="flex flex-col items-center gap-2 text-center"
-              >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    status.completed ? "bg-orange-500" : "bg-gray-200"
-                  } transition-colors duration-300`}
-                >
-                  <FaCheckSquare
-                    className={`w-4 h-4 ${
-                      status.completed ? "text-white" : "text-gray-400"
-                    }`}
-                  />
-                </div>
-                <span className="text-sm text-gray-600">{status.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Action Button */}
-        <div className="mt-8 max-w-md mx-auto">
-          <button
-            disabled={!validFace || !leftRightCompleted || !blinkCompleted}
-            className="w-full py-3 px-4 bg-orange-500 text-white rounded-lg font-medium disabled:bg-gray-200 disabled:text-gray-400 transition-all duration-300 hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-            onClick={setStep}
-          >
-            Continue to Next Step
-          </button>
-
-          <p className="text-xs text-gray-500 text-center mt-4">
-            Your photo will be used only for identity verification purposes
-          </p>
         </div>
       </div>
     </div>
   );
 };
+
+export default SelfieStep;

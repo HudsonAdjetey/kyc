@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, Sparkles, ArrowRight, Mail } from "lucide-react";
+import { CheckCircle, Sparkles,  Mail } from "lucide-react";
 
 export const CompleteStep = () => {
   const containerVariants = {
@@ -111,15 +111,7 @@ export const CompleteStep = () => {
             </p>
           </motion.div>
 
-          <motion.button
-            className="w-full py-4 px-6 bg-orange-500 text-white rounded-xl font-medium shadow-lg shadow-green-100 flex items-center justify-center gap-2"
-            whileHover={{ scale: 1.02, backgroundColor: "#22c55e" }}
-            whileTap={{ scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          >
-            Continue to Dashboard
-            <ArrowRight size={25} />
-          </motion.button>
+        
 
           <motion.div
             className="flex items-center justify-center gap-2 text-sm text-gray-500"
