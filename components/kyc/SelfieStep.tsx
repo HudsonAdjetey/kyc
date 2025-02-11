@@ -6,7 +6,14 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
-import { AlertCircle, ArrowLeft, Camera, CheckCircle2 } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Camera,
+  Check,
+  CheckCircle2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -275,7 +282,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     <div className="min-h-screen w-full bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="h-full flex flex-col">
         {/* Header Section */}
-        <div className="p-4 bg-white/90 shadow-sm">
+        <div className="px-4  py-2 bg-white/90 shadow-sm">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             <div className="flex items-center gap-3">
               <Button
@@ -399,9 +406,14 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
                   </p>
                 </div>
               )}
-
               {isCapturing && (
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute bottom-10 right-10 left-10 flex items-center justify-between inset-x-0">
+                  <X size={40} className="text-red-500" />
+                  <Check size={40} className="text-green-500" />
+                </div>
+              )}
+              {isCapturing && (
+                <div className="absolute backdrop-blur-md inset-0 flex items-center justify-center">
                   <div className="max-sm:w-[80%] w-[60%] h-[80%] border-2 border-white rounded-full opacity-50 animate-pulse" />
                 </div>
               )}

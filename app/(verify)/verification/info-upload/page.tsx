@@ -121,7 +121,7 @@ const KycVerification = () => {
     return () => clearInterval(interval);
   }, [err]);
   return (
-    <section className="container mx-auto px-4 py-8">
+    <section className="container mx-auto px-4 pb-8 pt-4">
       {renderStep()}
       {err && (
         <div className="mt-4 p-2 bg-red-100 text-red-700 rounded">{err}</div>
