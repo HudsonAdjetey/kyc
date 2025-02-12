@@ -1,4 +1,3 @@
-"use client";
 import React, {
   useState,
   useRef,
@@ -39,7 +38,7 @@ interface SelfieStepProps {
 const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [results, setResults] = useState<CaptureResult[]>([]); // Remove initial empty result
+  const [results, setResults] = useState<CaptureResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,6 +46,14 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isAllverified, setAllIsVerifed] = useState<boolean>(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [orientation, setOrientation] = useState<string>("portrait");
+  const errorTimeoutRef = useRef<NodeJS.Timeout>(null);
+  const [showSteps, setShowSteps] = useState(true);
+  const [activeInstruction, setActiveInstruction] = useState<string | null>(
+    null
+  );
+  const instructionTimeoutRef = useRef<NodeJS.Timeout>(null);
 
   const steps: VerificationStep[] = useMemo(
     () => [
@@ -79,7 +86,36 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     []
   );
 
-  // Add progress calculation effect
+  // Handle screen orientation
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      setOrientation(
+        window.innerHeight > window.innerWidth ? "portrait" : "landscape"
+      );
+    };
+
+    handleOrientationChange();
+    window.addEventListener("resize", handleOrientationChange);
+    return () => window.removeEventListener("resize", handleOrientationChange);
+  }, []);
+
+  // Error timeout handler
+  useEffect(() => {
+    if (error) {
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
+      errorTimeoutRef.current = setTimeout(() => {
+        setError(null);
+      }, 3000);
+    }
+    return () => {
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
+    };
+  }, [error]);
+
   useEffect(() => {
     const verifiedSteps = steps.filter((step) =>
       results.some((result) => result.typeImage === step.id && result.verified)
@@ -152,6 +188,43 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     }
     return null;
   }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setShowSteps(window.innerWidth >= 768);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Handle sequential instructions
+  useEffect(() => {
+    if (!isCapturing) return;
+
+    const showInstruction = () => {
+      setActiveInstruction(steps[currentStep].instruction);
+
+      // Clear previous timeout
+      if (instructionTimeoutRef.current) {
+        clearTimeout(instructionTimeoutRef.current);
+      }
+
+      // Set new timeout for current instruction
+      instructionTimeoutRef.current = setTimeout(() => {
+        setActiveInstruction(null);
+      }, 5000);
+    };
+
+    showInstruction();
+
+    return () => {
+      if (instructionTimeoutRef.current) {
+        clearTimeout(instructionTimeoutRef.current);
+      }
+    };
+  }, [currentStep, isCapturing, steps]);
 
   const verifyImage = useCallback(
     async (imageData: string) => {
@@ -282,7 +355,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     <div className="min-h-screen w-full bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="h-full flex flex-col">
         {/* Header Section */}
-        <div className="px-4  py-2 bg-white/90 shadow-sm">
+        <div className="sticky top-0 z-50 px-4 py-2 bg-white/90 backdrop-blur-sm shadow-sm">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             <div className="flex items-center gap-3">
               <Button
@@ -295,7 +368,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
               </Button>
               <div>
                 <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  Step 2 of 5
+                  Step {currentStep + 1} of {steps.length}
                 </span>
                 <h1 className="text-xl font-semibold text-gray-900 mt-1">
                   Identity Verification
@@ -342,98 +415,132 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto p-4">
-            {/* Progress Steps */}
-            <div className="grid grid-cols-4 gap-2 mb-6">
-              {steps.map((step, idx) => (
-                <div
-                  key={step.id}
-                  className={`flex flex-col items-center p-2 rounded-xl transition-all ${
-                    idx === currentStep
-                      ? "bg-orange-50 border-2 border-orange-200 shadow-sm"
-                      : idx < currentStep
-                      ? "bg-green-50 border border-green-200"
-                      : "bg-gray-50 border border-gray-200"
-                  }`}
-                >
-                  <div
-                    className={`rounded-full p-1 ${
-                      idx === currentStep
-                        ? "text-orange-500"
-                        : idx < currentStep
-                        ? "text-green-500"
-                        : "text-gray-400"
-                    }`}
-                  >
-                    {idx < currentStep ? (
-                      <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5" />
-                    ) : (
-                      <div className="h-4 w-4 md:h-5 md:w-5 rounded-full border-2 flex items-center justify-center text-xs">
-                        {idx + 1}
+        <div className="flex-1 relative overflow-y-auto">
+          <div className=" my-2">
+            {/* Show instruction alert */}
+            {activeInstruction && (
+              <Alert className="bg-orange-50 border-orange-200 transition-all w-fit z-[90] absolute duration-300 ease-in-out mx-4">
+                <AlertCircle className="h-4 w-4 text-orange-500" />
+                <AlertDescription className="text-orange-700 ml-2">
+                  {activeInstruction}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="max-w-7xl mx-auto px-4 py-2">
+              {/* Progress Steps - Only show on larger screens */}
+              {showSteps && (
+                <div className="grid grid-cols-4 gap-2 mb-6">
+                  {steps.map((step, idx) => (
+                    <div
+                      key={step.id}
+                      className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+                        idx === currentStep
+                          ? "bg-orange-50 border-2 border-orange-200 shadow-sm scale-105"
+                          : idx < currentStep
+                          ? "bg-green-50 border border-green-200"
+                          : "bg-gray-50 border border-gray-200"
+                      }`}
+                    >
+                      <div
+                        className={`rounded-full p-1 ${
+                          idx === currentStep
+                            ? "text-orange-500"
+                            : idx < currentStep
+                            ? "text-green-500"
+                            : "text-gray-400"
+                        }`}
+                      >
+                        {idx < currentStep ? (
+                          <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5" />
+                        ) : (
+                          <div className="h-4 w-4 md:h-5 md:w-5 rounded-full border-2 flex items-center justify-center text-xs">
+                            {idx + 1}
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <span className="text-xs mt-1 text-center font-medium">
+                        {step.title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Progress bar - Show on all screens */}
+              <div className="my-2">
+                <Progress
+                  value={progress}
+                  className="h-2 bg-gray-100 transition-all duration-300"
+                />
+                <p className="text-sm text-gray-500 text-right mt-1">
+                  {Math.round(progress)}% complete
+                </p>
+              </div>
+
+              {/* Camera View */}
+              <div className="relative aspect-[3/4] mx-auto sm:max-w-5xl md:aspect-video bg-black rounded-xl overflow-hidden  shadow-lg mb-4">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <canvas ref={canvasRef} className="hidden" />
+
+                {!isCapturing && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/70">
+                    <Button
+                      onClick={startCamera}
+                      size="lg"
+                      className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 shadow-lg transform hover:scale-105 transition-transform"
+                    >
+                      <Camera className="h-5 w-5" />
+                      Start Camera
+                    </Button>
+                    <p className="text-white/90 text-sm mt-4 max-w-md text-center px-4">
+                      We&apos;ll guide you through a quick verification process
+                    </p>
                   </div>
-                  <span className="text-xs mt-1 text-center font-medium hidden md:block">
-                    {step.title}
-                  </span>
-                </div>
-              ))}
-            </div>
+                )}
 
-            {/* Camera View */}
-            <div className="relative aspect-[3/4] mx-auto sm:max-w-3xl md:aspect-video bg-black rounded-xl overflow-hidden shadow-lg mb-4">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <canvas ref={canvasRef} className="hidden" />
+                {isCapturing && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-[85%] md:w-[60%] h-[80%] border-2 border-white rounded-full opacity-50 animate-pulse" />
+                  </div>
+                )}
 
-              {!isCapturing && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/70 backdrop-blur-sm">
-                  <Button
-                    onClick={startCamera}
-                    size="lg"
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 shadow-lg"
-                  >
-                    <Camera className="h-5 w-5" />
-                    Start Camera
-                  </Button>
-                  <p className="text-white/90 text-sm mt-4 max-w-md text-center px-4">
-                    We&apos;ll guide you through a quick verification process
-                  </p>
-                </div>
-              )}
-              {isCapturing && (
-                <div className="absolute bottom-10 right-10 left-10 flex items-center justify-between inset-x-0">
-                  <X size={40} className="text-red-500" />
-                  <Check size={40} className="text-green-500" />
-                </div>
-              )}
-              {isCapturing && (
-                <div className="absolute backdrop-blur-md inset-0 flex items-center justify-center">
-                  <div className="max-sm:w-[80%] w-[60%] h-[80%] border-2 border-white rounded-full opacity-50 animate-pulse" />
-                </div>
-              )}
-            </div>
+                {isCapturing &&
+                  steps[currentStep].id !== "blink" &&
+                  !isAllverified && (
+                    <div className="absolute bottom-2 inset-x-0 flex items-center justify-center gap-16 px-4">
+                      <Button
+                        variant="outline"
+                        onClick={stopCamera}
+                        className="bg-white/80 hover:bg-white/90 transition-all duration-300"
+                      >
+                        <X size={40} className="text-red-500" />
+                      </Button>
 
-            {/* Instructions and Errors */}
-            <div className="space-y-4">
-              {isCapturing && (
-                <Alert className="bg-orange-50 border-orange-200">
-                  <AlertCircle className="h-4 w-4 text-orange-500" />
-                  <AlertDescription className="text-orange-700 ml-2">
-                    {steps[currentStep].instruction}
-                  </AlertDescription>
-                </Alert>
-              )}
+                      <Button
+                        variant="outline"
+                        onClick={handleCapture}
+                        disabled={isProcessing}
+                        className={`bg-white/80 hover:bg-white/90 transition-all duration-300 ${
+                          isProcessing ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        <Check size={40} className="text-green-500" />
+                      </Button>
+                    </div>
+                  )}
+              </div>
 
+              {/* Error Display */}
               {error && (
                 <Alert
                   variant="destructive"
-                  className="bg-red-50 border-red-200 animate-shake"
+                  className="bg-red-50 border-red-200 animate-shake transition-all duration-300 ease-in-out"
                 >
                   <AlertCircle className="h-4 w-4 text-red-500" />
                   <AlertDescription className="text-red-700 ml-2">
@@ -442,47 +549,12 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
                 </Alert>
               )}
 
-              {/* Progress */}
-              <div className="space-y-2">
-                <Progress value={progress} className="h-2 bg-gray-100" />
-                <p className="text-sm text-gray-500 text-right">
-                  {progress}% complete
-                </p>
-              </div>
-
               {/* Action Buttons */}
-              <div className="flex justify-between gap-4 sticky bottom-4">
-                {isCapturing &&
-                  steps[currentStep].id !== "blink" &&
-                  !isAllverified && (
-                    <>
-                      <Button
-                        variant="outline"
-                        onClick={stopCamera}
-                        className="w-1/2 py-7"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleCapture}
-                        disabled={isProcessing}
-                        className="w-1/2 py-7 bg-orange-500 hover:bg-orange-600"
-                      >
-                        {isProcessing ? (
-                          <div className="flex items-center gap-2">
-                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                            Processing...
-                          </div>
-                        ) : (
-                          "Capture Image"
-                        )}
-                      </Button>
-                    </>
-                  )}
+              <div className="flex justify-between gap-4 sticky bottom-4 mt-4">
                 {isAllverified && (
                   <Button
                     onClick={setStep}
-                    className="w-full py-7 bg-green-500 hover:bg-green-600"
+                    className="w-full py-7 bg-green-500 hover:bg-green-600 transform hover:scale-105 transition-all duration-300 text-white font-medium text-lg"
                   >
                     Continue to Next Step
                   </Button>
