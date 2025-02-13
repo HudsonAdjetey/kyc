@@ -1,3 +1,5 @@
+"use client";
+
 import React, {
   useState,
   useRef,
@@ -10,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import { useRouter } from "next/navigation";
 
 interface VerificationStep {
   id: string;
@@ -46,6 +49,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
   const [activeInstruction, setActiveInstruction] = useState<string | null>(
     null
   );
+  const router = useRouter();
   const instructionTimeoutRef = useRef<NodeJS.Timeout>(null);
 
   const steps: VerificationStep[] = useMemo(
@@ -485,7 +489,9 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
               <div className="flex justify-between gap-4 sticky bottom-4 mt-4">
                 {isAllverified && (
                   <Button
-                    onClick={setStep}
+                    onClick={() => {
+                      router.push("/verification/document-verification/");
+                    }}
                     className="w-full py-7 bg-green-500 hover:bg-green-600 transform hover:scale-105 transition-all duration-300 text-white font-medium text-lg"
                   >
                     Continue to Next Step

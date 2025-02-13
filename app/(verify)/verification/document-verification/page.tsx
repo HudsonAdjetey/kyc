@@ -1,6 +1,8 @@
-import { useCallback, useState } from "react";
+"use client";
+
+import { useState } from "react";
 import { Camera, FileText, ShieldCheck, AlertTriangle } from "lucide-react";
-import { DocumentCapture, IdType } from "./DocumentCapture";
+import { IdType } from "@/components/kyc/DocumentCapture";
 import { motion, AnimatePresence } from "framer-motion";
 import { UseUserInfo } from "@/hooks/useUserInfo";
 import ImageBlur from "@/components/common/ImageBlur";
@@ -10,7 +12,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -19,7 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Label } from "../ui/label";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 
@@ -36,39 +38,15 @@ const ID_TYPE_LABELS: Record<IdType, string> = {
   nationalId: "National ID",
 };
 
-export const DocumentStep: React.FC<DocumentStepProps> = ({
-  step,
-  images,
-  onComplete,
-  updateStep,
-}) => {
+export const DocumentStep: React.FC<DocumentStepProps> = () => {
   const [documentStage, setDocumentStage] = useState<Step | "submit" | "">("");
   const [selectedIdType, setSelectedIdType] = useState<IdType>("nationalId");
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [images, setImages] = useState<Record<string, string>>({});
   const { userInfo } = UseUserInfo();
-  const router = useRouter()
+  const router = useRouter();
 
-  const handleCapture = useCallback(
-    (image: string) => {
-      onComplete(image);
-      setDocumentStage("");
-    },
-    [onComplete]
-  );
-
-  if (step === "front" || step === "back") {
-    return (
-      <DocumentCapture
-        type={step}
-        onCapture={handleCapture}
-        onCancel={() => updateStep("document")}
-        selfieImage={images.selfie || ""}
-      />
-    );
-  }
-
-  const progress = Object.values(images).filter(Boolean).length * 33.33;
-
+  const progress = Object?.values(images).filter(Boolean).length * 33.33;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -230,7 +208,9 @@ export const DocumentStep: React.FC<DocumentStepProps> = ({
                   <motion.button
                     key="proceed"
                     onClick={() => {
-                      router.push(`/document-verification/upload/${documentStage}`)
+                      router.push(
+                        `/verification/document-verification/upload/${documentStage}`
+                      );
                     }}
                     disabled={!documentStage}
                     className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"

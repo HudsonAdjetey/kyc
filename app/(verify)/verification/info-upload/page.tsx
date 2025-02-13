@@ -46,7 +46,7 @@ const KycVerification = () => {
     },
   ]);
 
-  const [step, setStep] = useState<Step>("preload");
+  const [step, setStep] = useState<Step>("document");
   const [images, setImages] = useState<{ [key in Step]?: string }>({});
   const [err, setErr] = useState<string | null>(null);
 

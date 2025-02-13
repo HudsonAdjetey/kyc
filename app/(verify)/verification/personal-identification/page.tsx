@@ -37,7 +37,7 @@ const Personal = () => {
       console.log("data")
     }
     if (data.fullName && data.phoneNumber) {
-      router.push("/verification/info-upload");
+      router.push("/verification/face-validation");
     }
   };
 
