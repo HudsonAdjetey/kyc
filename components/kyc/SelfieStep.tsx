@@ -5,17 +5,11 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Camera,
-  Check,
-  CheckCircle2,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Camera, Check, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 interface VerificationStep {
   id: string;
@@ -36,6 +30,7 @@ interface SelfieStepProps {
 }
 
 const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [results, setResults] = useState<CaptureResult[]>([]);
@@ -45,11 +40,9 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
   const [progress, setProgress] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isAllverified, setAllIsVerifed] = useState<boolean>(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [orientation, setOrientation] = useState<string>("portrait");
-  const errorTimeoutRef = useRef<NodeJS.Timeout>(null);
   const [showSteps, setShowSteps] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeInstruction, setActiveInstruction] = useState<string | null>(
     null
   );
@@ -86,35 +79,17 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     []
   );
 
-  // Handle screen orientation
-  useEffect(() => {
-    const handleOrientationChange = () => {
-      setOrientation(
-        window.innerHeight > window.innerWidth ? "portrait" : "landscape"
-      );
-    };
-
-    handleOrientationChange();
-    window.addEventListener("resize", handleOrientationChange);
-    return () => window.removeEventListener("resize", handleOrientationChange);
-  }, []);
-
-  // Error timeout handler
   useEffect(() => {
     if (error) {
-      if (errorTimeoutRef.current) {
-        clearTimeout(errorTimeoutRef.current);
-      }
-      errorTimeoutRef.current = setTimeout(() => {
-        setError(null);
-      }, 3000);
+      toast({
+        variant: "destructive",
+        title: "Verification Error",
+        description: error,
+        duration: 3000,
+      });
+      setError(null);
     }
-    return () => {
-      if (errorTimeoutRef.current) {
-        clearTimeout(errorTimeoutRef.current);
-      }
-    };
-  }, [error]);
+  }, [error, toast]);
 
   useEffect(() => {
     const verifiedSteps = steps.filter((step) =>
@@ -123,21 +98,6 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     const newProgress = (verifiedSteps / steps.length) * 100;
     setProgress(newProgress);
   }, [results, steps]);
-
-  const toggleFullScreen = useCallback(async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-        setIsFullScreen(true);
-      } else {
-        await document.exitFullscreen();
-        setIsFullScreen(false);
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Fullscreen mode is not supported on this device");
-    }
-  }, []);
 
   const startCamera = useCallback(async () => {
     try {
@@ -159,14 +119,16 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
         videoRef.current.srcObject = stream;
       }
       setIsCapturing(true);
-      setError(null);
     } catch (err) {
-      console.error(err);
-      setError(
-        "Unable to access camera. Please ensure you have granted permissions."
-      );
+      console.log(err);
+      toast({
+        variant: "destructive",
+        title: "Camera Error",
+        description:
+          "Unable to access camera. Please ensure you have granted permissions.",
+      });
     }
-  }, []);
+  }, [toast]);
 
   const stopCamera = useCallback(() => {
     if (videoRef.current?.srcObject) {
@@ -199,19 +161,20 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Handle sequential instructions
   useEffect(() => {
     if (!isCapturing) return;
 
     const showInstruction = () => {
       setActiveInstruction(steps[currentStep].instruction);
+      toast({
+        title: steps[currentStep].title,
+        description: steps[currentStep].instruction,
+      });
 
-      // Clear previous timeout
       if (instructionTimeoutRef.current) {
         clearTimeout(instructionTimeoutRef.current);
       }
 
-      // Set new timeout for current instruction
       instructionTimeoutRef.current = setTimeout(() => {
         setActiveInstruction(null);
       }, 5000);
@@ -224,7 +187,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
         clearTimeout(instructionTimeoutRef.current);
       }
     };
-  }, [currentStep, isCapturing, steps]);
+  }, [currentStep, isCapturing, steps, toast]);
 
   const verifyImage = useCallback(
     async (imageData: string) => {
@@ -240,28 +203,54 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
           }),
         });
 
+        console.log(response);
         if (!response.ok) {
-          setError("Verification failed");
-          console.log(response);
+          toast({
+            variant: "destructive",
+            title: "Verification Failed",
+            description: `Please ensure your ${steps[
+              currentStep
+            ].title.toLowerCase()} is clearly visible`,
+          });
           throw new Error("Verification failed");
         }
 
         const result = await response.json();
+        if (!result.verified) {
+          // using toast
+          toast({
+            variant: "destructive",
+            title: "Verification Failed",
+            /*    description: `Please ensure your ${steps[
+              currentStep
+            ].title.toLowerCase()} is clearly visible`, */
+            description: result.message,
+          });
+          return false;
+        }
         return result.verified;
       } catch (err) {
         console.log(err);
-        setError("Verification failed. Please try again.");
+        toast({
+          variant: "destructive",
+          title: "Verification Error",
+          description: "Please try again",
+        });
         return false;
       }
     },
-    [currentStep, steps]
+    [currentStep, steps, toast]
   );
 
   const handleCapture = async () => {
     const imageData = captureImage();
 
     if (!imageData) {
-      setError("Failed to capture image. Please try again.");
+      toast({
+        variant: "destructive",
+        title: "Capture Failed",
+        description: "Failed to capture image. Please try again.",
+      });
       return;
     }
     setIsProcessing(true);
@@ -280,12 +269,24 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
 
       if (currentStep < steps.length - 1) {
         setCurrentStep((prev) => prev + 1);
+        toast({
+          title: "Step Completed",
+          description: "Moving to next step",
+        });
       } else {
         stopCamera();
+        toast({
+          title: "Verification Complete",
+          description: "All steps completed successfully",
+        });
       }
     } catch (error) {
       console.log(error);
-      setError("Verification failed. Please try again.");
+      toast({
+        variant: "destructive",
+        title: "Verification Error",
+        description: "Please try again",
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -301,7 +302,11 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
         const imageData = captureImage();
 
         if (!imageData) {
-          setError("Failed to capture image. Please try again.");
+          toast({
+            variant: "destructive",
+            title: "Capture Failed",
+            description: "Failed to capture blink. Please try again.",
+          });
           break;
         }
 
@@ -313,15 +318,22 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
               ...prev,
               { typeImage: "blink", imageData, verified: true },
             ]);
-            setError(null);
+            toast({
+              title: "Blink Detected",
+              description: "Blink verification successful",
+            });
             setIsProcessing(false);
             break;
           }
         } catch (error) {
-          console.error("Blink verification error:", error);
-          setError(
-            "Verification failed. Please ensure good lighting and face visibility."
-          );
+          console.log(error);
+
+          setIsProcessing(false);
+          toast({
+            variant: "destructive",
+            title: "Blink Detection Error",
+            description: "Please ensure good lighting and face visibility",
+          });
         }
 
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -333,7 +345,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
     return () => {
       isMounted = false;
     };
-  }, [steps, currentStep, captureImage, verifyImage]);
+  }, [steps, currentStep, captureImage, verifyImage, toast]);
 
   useEffect(() => {
     if (isAllverified) return;
@@ -345,17 +357,21 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
 
     if (isVerificationComplete && faceResult) {
       setAllIsVerifed(true);
-      setError(null);
       setIsProcessing(false);
       onComplete(faceResult.imageData);
+      toast({
+        title: "Verification Complete",
+        description: "All steps completed successfully",
+      });
     }
-  }, [results, onComplete, setStep, steps.length, isAllverified, steps]);
+  }, [results, onComplete, setStep, steps.length, isAllverified, steps, toast]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-gray-50 to-gray-100">
+      <Toaster />
       <div className="h-full flex flex-col">
         {/* Header Section */}
-        <div className="sticky top-0 z-50 px-4 py-2 bg-white/90 backdrop-blur-sm shadow-sm">
+        <div className=" px-4 py-2 bg-white/90 backdrop-blur-sm shadow-sm">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             <div className="flex items-center gap-3">
               <Button
@@ -375,99 +391,13 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
                 </h1>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullScreen}
-              className="text-gray-500"
-            >
-              {isFullScreen ? (
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 9h6v6H9z"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0 0l-5-5m-7 11h4m-4 0v4m0-4l5 5m11-5h-4m4 0v4m0-4l-5 5"
-                  />
-                </svg>
-              )}
-            </Button>
           </div>
         </div>
 
         {/* Main Content */}
         <div className="flex-1 relative overflow-y-auto">
-          <div className=" my-2">
-            {/* Show instruction alert */}
-            {activeInstruction && (
-              <Alert className="bg-orange-50 border-orange-200 transition-all w-fit z-[90] absolute duration-300 ease-in-out mx-4">
-                <AlertCircle className="h-4 w-4 text-orange-500" />
-                <AlertDescription className="text-orange-700 ml-2">
-                  {activeInstruction}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="max-w-7xl mx-auto px-4 py-2">
-              {/* Progress Steps - Only show on larger screens */}
-              {showSteps && (
-                <div className="grid grid-cols-4 gap-2 mb-6">
-                  {steps.map((step, idx) => (
-                    <div
-                      key={step.id}
-                      className={`flex flex-col items-center p-2 rounded-xl transition-all ${
-                        idx === currentStep
-                          ? "bg-orange-50 border-2 border-orange-200 shadow-sm scale-105"
-                          : idx < currentStep
-                          ? "bg-green-50 border border-green-200"
-                          : "bg-gray-50 border border-gray-200"
-                      }`}
-                    >
-                      <div
-                        className={`rounded-full p-1 ${
-                          idx === currentStep
-                            ? "text-orange-500"
-                            : idx < currentStep
-                            ? "text-green-500"
-                            : "text-gray-400"
-                        }`}
-                      >
-                        {idx < currentStep ? (
-                          <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5" />
-                        ) : (
-                          <div className="h-4 w-4 md:h-5 md:w-5 rounded-full border-2 flex items-center justify-center text-xs">
-                            {idx + 1}
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-xs mt-1 text-center font-medium">
-                        {step.title}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Progress bar - Show on all screens */}
+          <div className="mt-2 mb-4">
+            <div className="aspect-[3/4] sm:max-w-5xl md:aspect-video mx-auto px-4 py-2">
               <div className="my-2">
                 <Progress
                   value={progress}
@@ -479,7 +409,7 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
               </div>
 
               {/* Camera View */}
-              <div className="relative aspect-[3/4] mx-auto sm:max-w-5xl md:aspect-video bg-black rounded-xl overflow-hidden  shadow-lg mb-4">
+              <div className="relative aspect-[3/4] mx-auto sm:max-w-5xl md:aspect-video bg-black rounded-xl overflow-hidden shadow-lg mb-4">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -503,51 +433,54 @@ const SelfieStep: React.FC<SelfieStepProps> = ({ onComplete, setStep }) => {
                     </p>
                   </div>
                 )}
+                {isCapturing}
 
                 {isCapturing && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[85%] md:w-[60%] h-[80%] border-2 border-white rounded-full opacity-50 animate-pulse" />
+                  <div className="absolute flex-col gap-5 inset-0 flex items-center justify-center ">
+                    <div className="w-[85%] md:w-[60%] h-[80%] border-2 border-white rounded-full pointer-events-none opacity-50 animate-pulse" />
+                    {isCapturing &&
+                      steps[currentStep].id !== "blink" &&
+                      !isAllverified && (
+                        <div className=" flex  items-center  gap-16 px-4">
+                          <Button
+                            variant="outline"
+                            onClick={stopCamera}
+                            className="bg-white/80  hover:bg-white/90 transition-all duration-300"
+                          >
+                            <X size={40} className="text-red-500" />
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            onClick={handleCapture}
+                            disabled={isProcessing}
+                            className={`bg-white/80 hover:bg-white/90 transition-all duration-300 ${
+                              isProcessing
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            {isProcessing ? (
+                              <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+                            ) : (
+                              <Check size={40} className="text-green-500" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
                   </div>
                 )}
 
-                {isCapturing &&
-                  steps[currentStep].id !== "blink" &&
-                  !isAllverified && (
-                    <div className="absolute bottom-2 inset-x-0 flex items-center justify-center gap-16 px-4">
-                      <Button
-                        variant="outline"
-                        onClick={stopCamera}
-                        className="bg-white/80 hover:bg-white/90 transition-all duration-300"
-                      >
-                        <X size={40} className="text-red-500" />
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        onClick={handleCapture}
-                        disabled={isProcessing}
-                        className={`bg-white/80 hover:bg-white/90 transition-all duration-300 ${
-                          isProcessing ? "opacity-50 cursor-not-allowed" : ""
-                        }`}
-                      >
-                        <Check size={40} className="text-green-500" />
-                      </Button>
+                {/* Processing Overlay */}
+                {isProcessing && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="bg-white rounded-lg p-4 flex flex-col items-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                      <p className="text-sm font-medium">Processing...</p>
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
-
-              {/* Error Display */}
-              {error && (
-                <Alert
-                  variant="destructive"
-                  className="bg-red-50 border-red-200 animate-shake transition-all duration-300 ease-in-out"
-                >
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                  <AlertDescription className="text-red-700 ml-2">
-                    {error}
-                  </AlertDescription>
-                </Alert>
-              )}
 
               {/* Action Buttons */}
               <div className="flex justify-between gap-4 sticky bottom-4 mt-4">

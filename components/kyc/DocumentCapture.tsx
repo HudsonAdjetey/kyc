@@ -1,6 +1,4 @@
-"use client";
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback,  useRef, useState } from "react";
 import Webcam from "react-webcam";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -10,7 +8,6 @@ import {
   X,
   Loader2,
   CreditCard,
-  AlertCircle,
 } from "lucide-react";
 import {
   Select,
@@ -19,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription } from "../ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 type IdType = "passport" | "driverLicense" | "nationalId";
 
@@ -41,39 +38,31 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
   const [uploading, setUploading] = useState<boolean>(false);
   const [selectedIdType, setSelectedIdType] = useState<IdType>("nationalId");
   const webCamRef = useRef<Webcam>(null);
-  const [err, setError] = useState<string>("");
-
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    if (err) {
-      setIsVisible(true);
-      const timer = setTimeout(() => {
-        setIsVisible(false);
-        setTimeout(() => setError(""), 300);
-      }, 400);
-
-      return () => clearTimeout(timer);
-    }
-  }, [err, setError]);
+  const { toast } = useToast();
 
   const initializeCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720, aspectRatio: 1.7777 },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          aspectRatio: { ideal: 1.7777 },
+          facingMode: "environment",
+        },
       });
 
       setStream(mediaStream);
-      setError("");
     } catch (error) {
-      console.error("Camera Access Error:", error);
-      setError(
-        error instanceof DOMException
-          ? `Camera Error: ${error.message}`
-          : "Unable to access camera"
-      );
+      toast({
+        variant: "destructive",
+        title: "Camera Error",
+        description:
+          error instanceof DOMException
+            ? error.message
+            : "Unable to access camera",
+      });
     }
-  }, [setError]);
+  }, [toast]);
 
   const stopCamera = useCallback(() => {
     if (stream) {
@@ -98,28 +87,35 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
         });
 
         const result = await response.json();
-        console.log(result);
+
         if (!response.ok) {
-          console.log(result.message || "Upload failed");
-          return;
+          throw new Error(result.message || "Upload failed");
         }
+
+        toast({
+          title: "Success",
+          description: "Document captured successfully",
+          duration: 3000,
+        });
+
         onCapture(result.imageData);
-        setError("");
       } catch (error) {
-        console.error(error);
-        setError(error instanceof Error ? error.message : "Upload failed");
+        toast({
+          variant: "destructive",
+          title: "Upload Error",
+          description: error instanceof Error ? error.message : "Upload failed",
+        });
       } finally {
         setUploading(false);
         stopCamera();
       }
     },
-    [selectedIdType, selfieImage, type, onCapture, setError, stopCamera]
+    [selectedIdType, selfieImage, type, onCapture, stopCamera, toast]
   );
 
   const captureImage = useCallback(async () => {
     if (!webCamRef.current) return;
     setProcessing(true);
-    setError("");
 
     try {
       const imageData = webCamRef.current.getScreenshot();
@@ -127,11 +123,15 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
 
       await uploadImage(imageData);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Capture failed");
+      toast({
+        variant: "destructive",
+        title: "Capture Error",
+        description: error instanceof Error ? error.message : "Capture failed",
+      });
     } finally {
       setProcessing(false);
     }
-  }, [setError, uploadImage]);
+  }, [uploadImage, toast]);
 
   const getIdTypeLabel = (idType: IdType): string => {
     switch (idType) {
@@ -145,167 +145,158 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <span className="bg-orange-500 text-white px-4 py-1.5 rounded-full text-sm font-medium">
-            Step {type === "front" ? "4" : "5"} of 5
-          </span>
-          <Select
-            value={selectedIdType}
-            onValueChange={(value: IdType) => setSelectedIdType(value)}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select ID Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="passport">Passport</SelectItem>
-              <SelectItem value="driverLicense">
-                Driver&apos;s License
-              </SelectItem>
-              <SelectItem value="nationalId">National ID</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <h1 className="text-2xl font-semibold text-gray-900">
-          Scan {type === "front" ? "Front" : "Back"} of{" "}
-          {getIdTypeLabel(selectedIdType)}
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Position your {getIdTypeLabel(selectedIdType).toLowerCase()} within
-          the frame and ensure all text is clearly visible.
-        </p>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <div className="relative aspect-[4/3] max-w-2xl mx-auto overflow-hidden rounded-xl">
-          <AnimatePresence mode="wait">
-            {stream ? (
-              <motion.div
-                key="camera"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="relative w-full h-full"
-              >
-                <Webcam
-                  ref={webCamRef}
-                  audio={false}
-                  screenshotFormat="image/png"
-                  videoConstraints={{
-                    facingMode: "environment",
-                    aspectRatio: 4 / 3,
-                  }}
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 border-4 border-orange-500 rounded-lg opacity-50" />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="placeholder"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl border-2 border-dashed border-gray-200"
-              >
-                <div className="text-center p-6">
-                  <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 font-medium">
-                    {err || `Ready to scan ${getIdTypeLabel(selectedIdType)}`}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Use good lighting and avoid glare
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {err && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg">
-            <p className="text-center text-red-600 text-sm">{err}</p>
-          </div>
-        )}
-
-        <div className="mt-8 flex max-md:flex-col justify-center gap-4">
-          <button
-            onClick={stream ? stopCamera : initializeCamera}
-            disabled={processing || uploading}
-            className="px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 transition-colors bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-          >
-            {stream ? (
-              <>
-                <CameraOff className="w-4 h-4" /> Stop Camera
-              </>
-            ) : (
-              <>
-                <Camera className="w-4 h-4" /> Start Camera
-              </>
-            )}
-          </button>
-
-          {stream && (
-            <button
-              onClick={captureImage}
-              disabled={processing || uploading}
-              className="px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:bg-orange-300 disabled:cursor-not-allowed"
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg">
+        <div className="p-4 md:p-6 lg:p-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <span className="inline-flex bg-orange-500 text-white px-4 py-1.5 rounded-full text-sm font-medium">
+              Step {type === "front" ? "4" : "5"} of 5
+            </span>
+            <Select
+              value={selectedIdType}
+              onValueChange={(value: IdType) => setSelectedIdType(value)}
             >
-              {processing || uploading ? (
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Select ID Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="passport">Passport</SelectItem>
+                <SelectItem value="driverLicense">
+                  Driver&apos;s License
+                </SelectItem>
+                <SelectItem value="nationalId">National ID</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-2">
+            Scan {type === "front" ? "Front" : "Back"} of{" "}
+            {getIdTypeLabel(selectedIdType)}
+          </h1>
+          <p className="text-sm md:text-base text-gray-600 mb-6">
+            Position your {getIdTypeLabel(selectedIdType).toLowerCase()} within
+            the frame and ensure all text is clearly visible.
+          </p>
+
+          <div className="relative aspect-[4/3] w-full max-w-2xl mx-auto overflow-hidden rounded-xl border-2 border-gray-200">
+            <AnimatePresence mode="wait">
+              {stream ? (
+                <motion.div
+                  key="camera"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="relative w-full h-full"
+                >
+                  <Webcam
+                    ref={webCamRef}
+                    audio={false}
+                    screenshotFormat="image/png"
+                    videoConstraints={{
+                      facingMode: "environment",
+                      aspectRatio: 4 / 3,
+                    }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-4 border-2 border-orange-500 rounded-lg opacity-50">
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-orange-500" />
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-orange-500" />
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-orange-500" />
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-orange-500" />
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="placeholder"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full h-full bg-gray-50 flex items-center justify-center"
+                >
+                  <div className="text-center p-4 md:p-6">
+                    <CreditCard className="w-12 h-12 md:w-16 md:h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 font-medium">
+                      Ready to scan {getIdTypeLabel(selectedIdType)}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Use good lighting and avoid glare
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="mt-6 md:mt-8 flex flex-col sm:flex-row justify-center gap-3 md:gap-4">
+            <button
+              onClick={stream ? stopCamera : initializeCamera}
+              disabled={processing || uploading}
+              className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 transition-colors bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+            >
+              {stream ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {processing ? "Processing..." : "Uploading..."}
+                  <CameraOff className="w-4 h-4" /> Stop Camera
                 </>
               ) : (
                 <>
-                  <CheckCircle className="w-4 h-4" /> Capture
+                  <Camera className="w-4 h-4" /> Start Camera
                 </>
               )}
             </button>
-          )}
 
-          <button
-            onClick={() => {
-              stopCamera();
-              onCancel();
-            }}
-            className="px-6 py-3 justify-center rounded-lg font-medium flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700"
-          >
-            <X className="w-4 h-4" /> Back
-          </button>
-        </div>
-        <AnimatePresence>
-          {isVisible && err && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4"
-            >
-              <Alert
-                variant="destructive"
-                className="flex items-center gap-2 shadow-lg"
+            {stream && (
+              <button
+                onClick={captureImage}
+                disabled={processing || uploading}
+                className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:bg-orange-300 disabled:cursor-not-allowed"
               >
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-sm font-medium">
-                  {err}
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                {processing || uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {processing ? "Processing..." : "Uploading..."}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" /> Capture
+                  </>
+                )}
+              </button>
+            )}
 
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">
-            Tips for best results:
-          </h3>
-          <ul className="text-xs text-gray-600 space-y-1">
-            <li>• Ensure all text is clearly visible and glare-free</li>
-            <li>• Place the document against a dark background</li>
-            <li>• Make sure all corners are visible in the frame</li>
-            <li>• Hold the camera steady when capturing</li>
-          </ul>
+            <button
+              onClick={() => {
+                stopCamera();
+                onCancel();
+              }}
+              className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium flex justify-center items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700"
+            >
+              <X className="w-4 h-4" /> Back
+            </button>
+          </div>
+
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">
+              Tips for best results:
+            </h3>
+            <ul className="text-xs text-gray-600 space-y-1.5">
+              <li className="flex items-center gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                Ensure all text is clearly visible and glare-free
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                Place the document against a dark background
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                Make sure all corners are visible in the frame
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                Hold the camera steady when capturing
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
