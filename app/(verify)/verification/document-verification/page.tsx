@@ -25,12 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 
-interface DocumentStepProps {
-  step: Step;
-  images: { [key in Step]?: string };
-  onComplete: (image: string) => void;
-  updateStep: (step: Step) => void;
-}
+
 
 const ID_TYPE_LABELS: Record<IdType, string> = {
   passport: "Passport",
@@ -38,7 +33,7 @@ const ID_TYPE_LABELS: Record<IdType, string> = {
   nationalId: "National ID",
 };
 
-export const DocumentStep: React.FC<DocumentStepProps> = () => {
+ const DocumentStep = () => {
   const [documentStage, setDocumentStage] = useState<Step | "submit" | "">("");
   const [selectedIdType, setSelectedIdType] = useState<IdType>("nationalId");
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -234,3 +229,4 @@ export const DocumentStep: React.FC<DocumentStepProps> = () => {
 };
 
 export default DocumentStep;
+
