@@ -120,7 +120,7 @@ function verifyBlinking(faceDetails: FaceDetail): boolean {
   const { Value, Confidence } = faceDetails.EyesOpen;
 
   // Adjust threshold to allow partial blinking
-  const confidenceThreshold = BLINK_CONFIDENCE_THRESHOLD - 5; // Allow slight margin
+  const confidenceThreshold = BLINK_CONFIDENCE_THRESHOLD - 5;
 
   const isBlinkDetected = !Value && (Confidence ?? 0) > confidenceThreshold;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Webcam from "react-webcam";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,8 @@ const Back = () => {
   const [uploading, setUploading] = useState<boolean>(false);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [selfieImage, setSelfieImage] = useState<string>("");
   const [processing, setProcessing] = useState<boolean>(false);
   const router = useRouter();
   const handleError = useCallback(
@@ -123,18 +125,33 @@ const Back = () => {
 
   const uploadImage = useCallback(
     async (imageData: string) => {
+      console.log(imageData);
       setUploading(true);
       try {
         await validateImage(imageData);
-        const formData = new FormData();
 
-        const response = await fetch("/api/verify-document/back", {
+        const response = await fetch("/api/verify-document", {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image: imageData,
+            docType: "back",
+            userId: "23323",
+            country: "ghana",
+          }),
         });
+        const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error((await response.text()) || "Upload failed");
+        if (!result.success) {
+          toast({
+            variant: "destructive",
+            title: "Document captured error",
+            description: "Try again",
+          });
+
+          throw new Error("Upload failed");
         }
 
         toast({
@@ -196,8 +213,8 @@ const Back = () => {
                 </span>
                 <Button
                   onClick={() => {
-                    stopCamera();
                     router.push("/verification/document-verification");
+                    stopCamera();
                   }}
                   variant="outline"
                   className=" sm:w-auto"

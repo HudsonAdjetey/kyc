@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Webcam from "react-webcam";
 import { useToast } from "@/hooks/use-toast";
@@ -128,7 +128,7 @@ const Front = () => {
       console.log(imageData);
       setUploading(true);
       try {
-        // const imageFile = await validateImage(imageData);
+        await validateImage(imageData);
 
         const response = await fetch("/api/verify-document", {
           method: "POST",
