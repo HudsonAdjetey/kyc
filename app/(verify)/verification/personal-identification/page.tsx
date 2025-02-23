@@ -1,50 +1,76 @@
 "use client";
 
-import React from "react";
-
+import React, { useMemo, useState } from "react";
 import "react-phone-number-input/style.css";
-
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
 import { Label } from "@/components/ui/label";
 import PhoneInput from "react-phone-number-input";
 import { useForm, Controller } from "react-hook-form";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import countryList from "react-select-country-list";
+import { CountryCode } from "libphonenumber-js";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface FormData {
+  phoneNumber: string;
+  fullName: string;
+}
 
 const Personal = () => {
-    const router = useRouter();
-  
+  const router = useRouter();
+  const options = useMemo(() => countryList().getData(), []);
+  const [selectedCountry, setSelectedCountry] = useState<string>("GH");
+  const [countryError, setCountryError] = useState<string>("");
+
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors },
-  } = useForm({
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
     defaultValues: {
       phoneNumber: "",
       fullName: "",
     },
   });
-  const onSubmit = (data: {
-    phoneNumber: string;
-    fullName: string;
-  }) => {
-    console.log(data);
-    if (data) {
-      console.log("data")
-    }
-    if (data.fullName && data.phoneNumber) {
-      router.push("/verification/face-validation");
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      setCountryError("");
+
+      if (!selectedCountry) {
+        setCountryError("Please select a country");
+        return;
+      }
+
+      console.log({ ...data, country: selectedCountry });
+
+      if (data.fullName && data.phoneNumber && selectedCountry) {
+        await router.push("/verification/face-validation");
+      }
+    } catch (error) {
+      console.error("Form submission error:", error);
     }
   };
 
+  const handleCountryChange = (value: string) => {
+    setSelectedCountry(value as string);
+    setCountryError("");
+  };
 
   return (
     <div className="container mx-auto px-4 py-10">
-      <Link href={"/verification"} className="mb-6 flex items-center gap-3">
+      <Link href="/verification" className="mb-6 flex items-center gap-3">
         <ChevronLeft className="w-4 h-4 mr-2" />
         Back to Verification Types
       </Link>
@@ -58,24 +84,61 @@ const Personal = () => {
             <Label htmlFor="fullName">Full Name</Label>
             <Input
               id="fullName"
-              {...register("fullName", { required: "Full name is required" })}
-              className={`${errors.fullName ? "border-red-500" : ""} `}
+              {...register("fullName", {
+                required: "Full name is required",
+                minLength: {
+                  value: 2,
+                  message: "Name must be at least 2 characters long",
+                },
+              })}
+              className={`${errors.fullName ? "border-red-500" : ""}`}
             />
-            <p className="text-red-500 text-sm">{errors?.fullName?.message}</p>
+            {errors.fullName && (
+              <p className="text-red-500 text-sm">{errors.fullName.message}</p>
+            )}
           </div>
 
-      
-     
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Select value={selectedCountry} onValueChange={handleCountryChange}>
+              <SelectTrigger
+                className={`w-full h-14 py-6 ${
+                  countryError ? "border-red-500" : ""
+                }`}
+              >
+                <SelectValue placeholder="Select Country" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((country) => (
+                  <SelectItem key={country.value} value={country.value}>
+                    {country.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {countryError && (
+              <p className="text-red-500 text-sm">{countryError}</p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
             <Controller
               name="phoneNumber"
               control={control}
-              rules={{ required: "Phone number is required" }}
+              rules={{
+                required: "Phone number is required",
+                validate: (value) => {
+                  if (value && value.length < 8) {
+                    return "Please enter a valid phone number";
+                  }
+                  return true;
+                },
+              }}
               render={({ field: { onChange, value } }) => (
                 <PhoneInput
                   international
-                  defaultCountry="GH"
+                  defaultCountry={selectedCountry as CountryCode}
                   value={value}
                   onChange={onChange}
                   className={`border rounded-md p-2 w-full ${
@@ -84,13 +147,19 @@ const Personal = () => {
                 />
               )}
             />
+            {errors.phoneNumber && (
+              <p className="text-red-500 text-sm">
+                {errors.phoneNumber.message}
+              </p>
+            )}
           </div>
 
           <Button
             type="submit"
-            className="w-full bg-orange-400 hover:bg-orange-300 text-white py-6"
+            disabled={isSubmitting}
+            className="w-full bg-orange-400 hover:bg-orange-300 text-white py-6 disabled:opacity-50"
           >
-            Submit Verification
+            {isSubmitting ? "Submitting..." : "Submit Verification"}
           </Button>
         </form>
       </div>

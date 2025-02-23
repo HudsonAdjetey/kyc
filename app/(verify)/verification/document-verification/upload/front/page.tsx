@@ -125,19 +125,33 @@ const Front = () => {
 
   const uploadImage = useCallback(
     async (imageData: string) => {
+      console.log(imageData);
       setUploading(true);
       try {
-        await validateImage(imageData);
-        const formData = new FormData();
-        if (selfieImage) formData.append("selfieImage", selfieImage.toString());
+        // const imageFile = await validateImage(imageData);
 
-        const response = await fetch("/api/verify-document/front", {
+        const response = await fetch("/api/verify-document", {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image: imageData,
+            docType: "front",
+            userId: "23323",
+            country: "ghana",
+          }),
         });
+        const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error((await response.text()) || "Upload failed");
+        if (!result.success) {
+          toast({
+            variant: "destructive",
+            title: "Document captured error",
+            description: "Try again",
+          });
+
+          throw new Error("Upload failed");
         }
 
         toast({
@@ -168,7 +182,7 @@ const Front = () => {
         setUploading(false);
       }
     },
-    [handleError, retryCount, selfieImage, toast, validateImage]
+    [handleError, retryCount, toast, validateImage]
   );
 
   const captureImage = useCallback(async () => {

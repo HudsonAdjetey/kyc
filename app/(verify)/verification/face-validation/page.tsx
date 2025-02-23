@@ -49,8 +49,8 @@ const SelfieStep = () => {
   const [isModelLoaded, setIsModelLoaded] = useState<boolean>(false);
   const [faceDetected, setFaceDetected] = useState<boolean>(false);
   const [isWellLit, setIsWellLit] = useState<boolean>(false);
-  const [facePosition, setFacePosition] = useState<"left" | "center" | "right">(
-    "center"
+  const [facePosition, setFacePosition] = useState<"left" | "front" | "right">(
+    "front"
   );
   const [detectionStarted, setDetectionStarted] = useState<boolean>(false);
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,7 +58,7 @@ const SelfieStep = () => {
   const steps: VerificationStep[] = useMemo(
     () => [
       {
-        id: "face",
+        id: "front",
         title: "Face Detection",
         instruction:
           "Position your face within the frame and look straight ahead",
@@ -230,13 +230,13 @@ const SelfieStep = () => {
   const getFacePosition = (
     jawOutline: faceapi.Point[],
     nose: faceapi.Point[]
-  ): "left" | "center" | "right" => {
+  ): "left" | "front" | "right" => {
     const jawWidth = jawOutline[16].x - jawOutline[0].x;
     const nosePosition = (nose[3].x - jawOutline[0].x) / jawWidth;
 
     if (nosePosition < 0.45) return "right";
     if (nosePosition > 0.55) return "left";
-    return "center";
+    return "front";
   };
 
   useEffect(() => {
@@ -363,11 +363,14 @@ const SelfieStep = () => {
           },
           body: JSON.stringify({
             image: imageData,
-            step: steps[currentStep].id,
+            imageType: steps[currentStep].id,
+            userId: "23323",
           }),
         });
 
-        if (!response.ok) {
+        const result = await response.json();
+        console.log(result);
+        if (!result.success) {
           toast({
             variant: "destructive",
             title: "Verification Failed",
@@ -376,23 +379,23 @@ const SelfieStep = () => {
             ].title.toLowerCase()} is clearly visible`,
           });
           console.log("Verification failed");
-          return;
-        }
-
-        const result = await response.json();
-        if (!result.verified) {
-          toast({
-            variant: "destructive",
-            title: "Verification Failed",
-            description:
-              result.message ||
-              `Please ensure your ${steps[
-                currentStep
-              ].title.toLowerCase()} is clearly visible`,
-          });
           return false;
         }
-        return result.verified;
+
+        // if (!result.verified) {
+        //   toast({
+        //     variant: "destructive",
+        //     title: "Verification Failed",
+        //     description:
+        //       result.message ||
+        //       `Please ensure your ${steps[
+        //         currentStep
+        //       ].title.toLowerCase()} is clearly visible`,
+        //   });
+        //   return false;
+        // }
+
+        return true;
       } catch (err) {
         console.error("Verification error:", err);
         toast({
@@ -421,6 +424,7 @@ const SelfieStep = () => {
 
     try {
       const verified = await verifyImage(imageData);
+      console.log(verified);
       if (!verified) {
         setIsProcessing(false);
         return;
@@ -448,13 +452,15 @@ const SelfieStep = () => {
     }
   }, [captureImage, currentStep, steps, toast, verifyImage]);
 
+  // For left position capture
   useEffect(() => {
     if (steps[currentStep].id !== "left") return;
 
     let isMount = true;
     const handleLeftCapture = async () => {
       while (isMount) {
-        if (facePosition !== "left") {
+        // Add checks for face detection and lighting
+        if (!faceDetected || !isWellLit || facePosition !== "left") {
           await new Promise((resolve) => setTimeout(resolve, 500));
           continue;
         }
@@ -503,15 +509,26 @@ const SelfieStep = () => {
     return () => {
       isMount = false;
     };
-  }, [captureImage, currentStep, facePosition, steps, toast, verifyImage]);
+  }, [
+    captureImage,
+    currentStep,
+    faceDetected,
+    isWellLit,
+    facePosition,
+    steps,
+    toast,
+    verifyImage,
+  ]);
 
+  // For right position capture
   useEffect(() => {
     if (steps[currentStep].id !== "right") return;
 
     let isMount = true;
     const handleRightCapture = async () => {
       while (isMount) {
-        if (facePosition !== "right") {
+        // Add checks for face detection and lighting
+        if (!faceDetected || !isWellLit || facePosition !== "right") {
           await new Promise((resolve) => setTimeout(resolve, 500));
           continue;
         }
@@ -560,8 +577,18 @@ const SelfieStep = () => {
     return () => {
       isMount = false;
     };
-  }, [captureImage, currentStep, facePosition, steps, toast, verifyImage]);
+  }, [
+    captureImage,
+    currentStep,
+    faceDetected,
+    isWellLit,
+    facePosition,
+    steps,
+    toast,
+    verifyImage,
+  ]);
 
+  // For blink detection
   useEffect(() => {
     if (steps[currentStep].id !== "blink") return;
 
@@ -569,6 +596,12 @@ const SelfieStep = () => {
 
     const handleBlinkDetection = async () => {
       while (isMounted) {
+        // Add checks for face detection and lighting
+        if (!faceDetected || !isWellLit) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+
         const imageData = captureImage();
 
         if (!imageData) {
@@ -593,7 +626,7 @@ const SelfieStep = () => {
               title: "Blink Detected",
               description: "Blink verification successful",
             });
-            setCurrentStep(3);
+            setAllIsVerifed(true);
             break;
           }
         } catch (error) {
@@ -616,13 +649,28 @@ const SelfieStep = () => {
     return () => {
       isMounted = false;
     };
-  }, [steps, currentStep, captureImage, verifyImage, toast]);
+  }, [
+    steps,
+    currentStep,
+    faceDetected,
+    isWellLit,
+    captureImage,
+    verifyImage,
+    toast,
+  ]);
+
+  useEffect(()=>{
+    if (isAllverified) {
+      // stop the camera
+      stopCamera();
+    }
+  },[isAllverified, stopCamera])
 
   const getBorderColor = () => {
     if (!faceDetected) return "border-gray-400";
     if (!isWellLit) return "border-yellow-400";
 
-    if (steps[currentStep].id === "face" && facePosition === "center") {
+    if (steps[currentStep].id === "front" && facePosition === "front") {
       return "border-green-500";
     } else if (steps[currentStep].id === "left" && facePosition === "left") {
       return "border-green-500";
@@ -639,8 +687,8 @@ const SelfieStep = () => {
     if (!faceDetected || !isWellLit || isProcessing) return false;
 
     const currentStepId = steps[currentStep].id;
-    if (currentStepId === "face") {
-      return facePosition === "center";
+    if (currentStepId === "front") {
+      return facePosition === "front";
     }
 
     return false;

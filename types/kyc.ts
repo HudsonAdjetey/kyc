@@ -61,3 +61,26 @@ export interface FaceDetectionResult {
 
 
 
+
+
+
+export interface VerificationRequest {
+  frontImage: string
+  backImage: string
+  faceImage: string
+}
+
+export interface VerificationResponse {
+  verified: boolean
+  message: string
+  documentDetails?: DocumentDetails
+}
+
+export interface DocumentDetails {
+  type: string
+  personalIdNumber: string
+  name: string
+  expiryDate?: string
+  dateOfBirth?: string
+  nationality?: string
+}

@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  DocumentVerificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: document_verification.lambda_handler
+      Runtime: python3.8
+      CodeUri: ./lambda/document_verification
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          S3_BUCKET_NAME: rds-kyc22
+          FACE_MATCH_THRESHOLD: 90.0
+          KYC_TABLE_NAME: rds-kyc22
+
+  FaceValidationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: face_validation.lambda_handler
+      Runtime: python3.8
+      CodeUri: ./lambda/face_validation
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          REKOGNITION_THRESHOLD: 95.0
+          KYC_TABLE_NAME: rds-kyc22
+
+  RDSKYC22Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: rds-kyc22
+    DeletionPolicy: Retain
+
+  RDSKYC22Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: rds-kyc22
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
