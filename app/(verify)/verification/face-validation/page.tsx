@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
 import * as faceapi from "face-api.js";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 interface VerificationStep {
   id: string;
   title: string;
@@ -222,7 +223,7 @@ const SelfieStep = () => {
     }
     // For right step, we require right position and auto-capture
     else if (currentStepId === "right" && newFacePosition === "right") {
-      alert("Left position");
+      alert("Right position");
     }
     // For blink step, detect eyes closed
   };
@@ -659,12 +660,12 @@ const SelfieStep = () => {
     toast,
   ]);
 
-  useEffect(()=>{
+  useEffect(() => {
     if (isAllverified) {
       // stop the camera
       stopCamera();
     }
-  },[isAllverified, stopCamera])
+  }, [isAllverified, stopCamera]);
 
   const getBorderColor = () => {
     if (!faceDetected) return "border-gray-400";
@@ -741,6 +742,29 @@ const SelfieStep = () => {
 
         {/* Main Content */}
         <div className="flex-1 relative overflow-y-auto">
+          {isCapturing && steps[currentStep].id === "right" && (
+            <Alert className="fixed mg-10 bg-green-400  max-w-md mx-auto inset-x-0 shadow-md z-20 rounded-none border-t-0 border-x-0">
+              <AlertDescription className="text-base font-medium text-center">
+                Please turn your head to the right and hold position
+              </AlertDescription>
+            </Alert>
+          )}
+          {isCapturing && steps[currentStep].id === "left" && (
+            <Alert className="fixed mg-10 bg-green-400  max-w-md mx-auto inset-x-0 shadow-md z-20 rounded-none border-t-0 border-x-0">
+              <AlertDescription className="text-base font-medium text-center">
+                Please turn your head to the left and hold position
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {isCapturing && steps[currentStep].id === "front" && (
+            <Alert className="fixed mg-10 bg-green-400  max-w-md mx-auto inset-x-0 shadow-md z-20 rounded-none border-t-0 border-x-0">
+              <AlertDescription className="text-base font-medium text-center">
+                Please look straight ahead and hold position
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="mt-4 mb-4 px-4 max-w-4xl mx-auto">
             {/* Progress Steps - Mobile Friendly */}
             <div className="mb-6">
@@ -840,11 +864,14 @@ const SelfieStep = () => {
 
                 {isCapturing && (
                   <div className="absolute inset-0  flex flex-col items-center justify-center">
-                    {/* Face Guide - More Visible on Mobile */}
+                    {/* Oval Face Guide - More Visible on Mobile */}
                     <div
-                      className={`w-[88%] ${getBorderColor()} border-4 sm:w-[70%] aspect-square rounded-full pointer-events-none transition-all duration-300 ${
+                      className={`w-[88%] ${getBorderColor()} border-4 sm:w-[70%] h-[90%] rounded-full pointer-events-none transition-all duration-300 ${
                         faceDetected ? "opacity-75" : "opacity-40"
                       }`}
+                      style={{
+                        borderRadius: "50%",
+                      }}
                     ></div>
 
                     {/* Status Indicators - Enhanced for Mobile */}
