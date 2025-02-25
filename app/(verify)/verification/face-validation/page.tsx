@@ -844,20 +844,25 @@ const SelfieStep = () => {
                         <Camera className="h-8 w-8 sm:h-10 sm:w-10 text-orange-500" />
                       </div>
                       <h3 className="text-white text-xl sm:text-2xl font-medium mb-3">
-                        Ready to Verify
+                        {isAllverified
+                          ? "Verification Complete!"
+                          : "Face Verification"}
                       </h3>
                       <p className="text-gray-300 text-sm mb-6 max-w-xs mx-auto">
-                        We&apos;ll guide you through a quick and secure
-                        verification process
+                        {isAllverified
+                          ? "Your face has been verified successfully!"
+                          : "We will guide you through the process of verifying your face."}
                       </p>
-                      <Button
-                        onClick={startCamera}
-                        size="lg"
-                        className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-7 rounded-xl flex items-center gap-2 mx-auto transform hover:scale-105 transition-all duration-300"
-                      >
-                        <Camera className="h-6 w-6" />
-                        Start Verification
-                      </Button>
+                      {!isAllverified && (
+                        <Button
+                          onClick={startCamera}
+                          size="lg"
+                          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-7 rounded-xl flex items-center gap-2 mx-auto transform hover:scale-105 transition-all duration-300"
+                        >
+                          <Camera className="h-6 w-6" />
+                          Start Verification
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -967,7 +972,7 @@ const SelfieStep = () => {
                     onClick={() =>
                       router.push("/verification/document-verification/")
                     }
-                    className="w-full py-4 sm:py-6 bg-orange-500 hover:bg-green-600 text-white font-medium text-base sm:text-lg rounded-xl shadow-lg transform hover:scale-[1.02] transition-all duration-300"
+                    className="w-full py-7 sm:py-6 bg-orange-500 hover:bg-green-600 text-white font-medium text-base sm:text-lg rounded-xl shadow-lg transform hover:scale-[1.02] transition-all duration-300"
                   >
                     Continue to Next Step
                   </Button>
