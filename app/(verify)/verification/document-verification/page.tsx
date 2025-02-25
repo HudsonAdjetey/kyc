@@ -25,15 +25,13 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 
-
-
 const ID_TYPE_LABELS: Record<IdType, string> = {
   passport: "Passport",
   driverLicense: "Driver's License",
   nationalId: "National ID",
 };
 
- const DocumentStep = () => {
+const DocumentStep = () => {
   const [documentStage, setDocumentStage] = useState<Step | "submit" | "">("");
   const [selectedIdType, setSelectedIdType] = useState<IdType>("nationalId");
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -125,7 +123,12 @@ const ID_TYPE_LABELS: Record<IdType, string> = {
               {["front", "back"].map((side) => (
                 <motion.button
                   key={side}
-                  onClick={() => setDocumentStage(side as Step)}
+                  onClick={() => {
+                    setDocumentStage(side as Step);
+                    router.push(
+                      `/verification/document-verification/upload/${side}`
+                    );
+                  }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className={`relative p-6 rounded-xl border-2 ${
@@ -199,21 +202,15 @@ const ID_TYPE_LABELS: Record<IdType, string> = {
                     <ShieldCheck className="w-5 h-5" />
                     Submit Documents for Verification
                   </motion.button>
-                ) : (
-                  <motion.button
-                    key="proceed"
-                    onClick={() => {
-                      router.push(
-                        `/verification/document-verification/upload/${documentStage}`
-                      );
-                    }}
-                    disabled={!documentStage}
-                    className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <Camera className="w-5 h-5" />
-                    Capture Document
-                  </motion.button>
-                )}
+                ) : // <motion.button
+                //   key="proceed"
+                //   disabled={!documentStage}
+                //   className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                // >
+                //   <Camera className="w-5 h-5" />
+                //   Capture Document
+                // </motion.button>
+                null}
               </AnimatePresence>
 
               <p className="text-sm text-gray-500 text-center">
@@ -229,4 +226,3 @@ const ID_TYPE_LABELS: Record<IdType, string> = {
 };
 
 export default DocumentStep;
-
