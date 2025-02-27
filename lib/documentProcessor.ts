@@ -1,9 +1,14 @@
-import { RekognitionClient, DetectTextCommand, type TextDetection } from "@aws-sdk/client-rekognition"
+import {
+  RekognitionClient,
+  DetectTextCommand,
+  DetectFacesCommand,
+  type TextDetection,
+} from "@aws-sdk/client-rekognition"
 import { TextractClient, AnalyzeDocumentCommand, type Block } from "@aws-sdk/client-textract"
-import { detectDocumentType } from "./documentClassifier"
 import { extractRelevantFields } from "./fieldExtractor"
-import type { DocumentType, ProcessingResult } from "./types"
 import { logger } from "./logger"
+import type {  DocumentType,   } from "./types"
+import { DocSide, DocumentProcessingError } from "@/types/kyc"
 import { validateDocument } from "./documetValidator"
 
 const rekognitionClient = new RekognitionClient({ region: process.env.AWS_REGION })
@@ -11,33 +16,120 @@ const textractClient = new TextractClient({ region: process.env.AWS_REGION })
 
 export async function processDocument(
   buffer: Buffer,
-  docType: DocumentType,
+  docSide: DocSide,
+  documentType: DocumentType,
   country: string,
-): Promise<ProcessingResult> {
-  logger.info("Processing document", { docType, country })
+){
+  logger.info("Processing document", { docSide, documentType, country })
 
-  // Analyze the document using AWS services
-  const [rekognitionResult, textractResult] = await Promise.all([
-    analyzeWithRekognition(buffer),
-    analyzeWithTextract(buffer),
-  ])
+  try {
+    // Convert base64 to buffer
 
-  // Detect the document type
-  const detectedDocType = await detectDocumentType(rekognitionResult, textractResult, docType)
+    // For front side, check for face first
+    if (docSide === "front") {
+      const hasFace = await detectFace(buffer)
+      if (!hasFace) {
+        const error = new Error("No face detected on front side of document") as DocumentProcessingError
+        error.code = "NO_FACE_DETECTED"
+        throw error
+      }
+    }
 
-  const extractedFields =  extractRelevantFields(detectedDocType, rekognitionResult, textractResult, country)
+    // Analyze the document using AWS services
+    const [rekognitionResult, textractResult] = await Promise.all([
+      analyzeWithRekognition(buffer),
+      analyzeWithTextract(buffer),
+    ])
 
-  const validationResult =  validateDocument(detectedDocType, extractedFields, country)
+    // Extract relevant fields based on the document type and side
+    const extractedFields = await extractRelevantFields(
+      documentType,
+      rekognitionResult,
+      textractResult,
+      country
+    )
 
-  const additionalChecks = await  performAdditionalChecks(extractedFields)
+    // Validate the extracted information
+    const validationResult = await validateDocument(documentType, extractedFields , country)
 
-  logger.info("Document processing completed", { detectedDocType })
+    // Check if required fields are present based on document type and side
+    validateRequiredFields(documentType, docSide, extractedFields)
 
-  return {
-    detectedDocType,
-    extractedFields,
-    validationResult,
-    additionalChecks,
+    // Perform additional checks (e.g., age verification)
+    const additionalChecks = await performAdditionalChecks(extractedFields)
+
+    logger.info("Document processing completed", { documentType, docSide })
+
+    return {
+      hasFace: docSide === "front" ? true : undefined,
+      extractedFields,
+      validationResult,
+      additionalChecks,
+    }
+  } catch (error) {
+    logger.error("Error processing document", error as Error)
+
+    // Convert generic errors to DocumentProcessingError
+    if (!(error as DocumentProcessingError).code) {
+      const processingError = error as DocumentProcessingError
+      processingError.code = "EXTRACTION_FAILED"
+      processingError.details = {
+        documentType,
+        docSide,
+        originalError: (error as Error).message,
+      }
+      throw processingError
+    }
+    throw error
+  }
+}
+
+function validateRequiredFields(documentType: DocumentType, docSide: DocSide, fields: Record<string, string>): void {
+  const requiredFields: Record<DocumentType, Record<DocSide, string[]>> = {
+    GHANA_CARD: {
+      front: ["cardNumber", "fullName", "dateOfBirth"],
+      back: ["dateOfExpiry", "dateOfIssue"],
+    },
+    PASSPORT: {
+      front: ["passportNumber", "fullName", "dateOfBirth"],
+      back: ["dateOfExpiry"],
+    },
+    DRIVERS_LICENSE: {
+      front: ["licenseNumber", "fullName", "dateOfBirth"],
+      back: ["dateOfExpiry"],
+    },
+    VOTER_ID: {
+      front: ["voterIdNumber", "fullName"],
+      back: ["pollingStation"],
+    },
+    "UNKNOWN": {
+      front: [],
+      back: [],
+    }
+  }
+
+  const required = requiredFields[documentType][docSide]
+  const missing = required.filter((field) => !fields[field])
+
+  if (missing.length > 0) {
+    const error = new Error(`Missing required fields: ${missing.join(", ")}`) as DocumentProcessingError
+    error.code = "EXTRACTION_FAILED"
+    error.details = { missing, documentType, docSide }
+    throw error
+  }
+}
+
+async function detectFace(buffer: Buffer): Promise<boolean> {
+  try {
+    const command = new DetectFacesCommand({
+      Image: { Bytes: buffer },
+      Attributes: ["DEFAULT"],
+    })
+    const response = await rekognitionClient.send(command)
+    return (response.FaceDetails?.length ?? 0) > 0
+  } catch (error) {
+    logger.error("Error detecting face", error as Error)
+    return false
   }
 }
 

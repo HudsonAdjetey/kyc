@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import AWS from "aws-sdk"
+import { SelfieService } from "@/lib/services/selfieService"
+import { SelfieStep } from "@/lib/model/selfie"
+import { z } from "zod"
 
 // Configure AWS SDK
 AWS.config.update({
@@ -11,23 +14,12 @@ AWS.config.update({
 const s3 = new AWS.S3()
 const rekognition = new AWS.Rekognition()
 
-// Define the strict sequence of stages
-const UPLOAD_SEQUENCE = ["front", "left", "right", "blink"] as const
-type ImageType = (typeof UPLOAD_SEQUENCE)[number]
-
-// Map to store user upload stages in memory
-const userStages: Record<string, Set<string>> = {}
-const userResults: Record<string, Record<ImageType, string>> = {}
-
-class ImageProcessingError extends Error {
-  constructor(
-    public message: string,
-    public errorType: string,
-  ) {
-    super(message)
-    this.name = "ImageProcessingError"
-  }
-}
+// Validation schema
+const imageUploadSchema = z.object({
+  userId: z.string(),
+  image: z.string(),
+  step: z.enum([SelfieStep.FRONT, SelfieStep.LEFT, SelfieStep.RIGHT, SelfieStep.BLINK]),
+})
 
 // Constants for thresholds
 const YAW_THRESHOLD = 15
@@ -55,6 +47,16 @@ interface FaceDetail {
   Pose?: Pose
   Quality?: ImageQuality
   EyesOpen?: EyeOpen
+}
+
+class ImageProcessingError extends Error {
+  constructor(
+    public message: string,
+    public errorType: string,
+  ) {
+    super(message)
+    this.name = "ImageProcessingError"
+  }
 }
 
 function isQualityAcceptable(quality: ImageQuality): boolean {
@@ -113,32 +115,30 @@ function verifyRightPose(faceDetails: FaceDetail): boolean {
 
 function verifyBlinking(faceDetails: FaceDetail): boolean {
   if (!faceDetails.EyesOpen || faceDetails.EyesOpen.Value === undefined) {
-    console.error("Blinking verification failed: EyesOpen data is missing.");
-    return false;
+    console.error("Blinking verification failed: EyesOpen data is missing.")
+    return false
   }
 
-  const { Value, Confidence } = faceDetails.EyesOpen;
+  const { Value, Confidence } = faceDetails.EyesOpen
 
-  // Adjust threshold to allow partial blinking
-  const confidenceThreshold = BLINK_CONFIDENCE_THRESHOLD - 5;
+  const confidenceThreshold = BLINK_CONFIDENCE_THRESHOLD - 5
 
-  const isBlinkDetected = !Value && (Confidence ?? 0) > confidenceThreshold;
+  const isBlinkDetected = !Value && (Confidence ?? 0) > confidenceThreshold
 
-  console.log(`Blink detection: ${isBlinkDetected ? "Valid" : "Invalid"} (Confidence: ${Confidence})`);
+  console.log(`Blink detection: ${isBlinkDetected ? "Valid" : "Invalid"} (Confidence: ${Confidence})`)
 
-  return isBlinkDetected;
+  return isBlinkDetected
 }
 
-
-function verifyFaceDetails(faceDetails: FaceDetail, stage: ImageType): boolean {
-  switch (stage) {
-    case "front":
+function verifyFaceDetails(faceDetails: FaceDetail, step: SelfieStep): boolean {
+  switch (step) {
+    case SelfieStep.FRONT:
       return verifyFrontPose(faceDetails)
-    case "left":
+    case SelfieStep.LEFT:
       return verifyLeftPose(faceDetails)
-    case "right":
+    case SelfieStep.RIGHT:
       return verifyRightPose(faceDetails)
-    case "blink":
+    case SelfieStep.BLINK:
       return verifyBlinking(faceDetails)
     default:
       return false
@@ -161,80 +161,17 @@ async function getFaceDetails(image: string): Promise<FaceDetail> {
 
     return result.FaceDetails[0]
   } catch (error) {
-    console.log(error)
+    console.error("Face detection error:", error)
     throw new ImageProcessingError("Face detection failed", "PROCESSING_ERROR")
   }
 }
 
-
-export async function POST(req: NextRequest) {
-  try {
-    const { image, userId } = await req.json()
-
-    if (!userId || !image) {
-      return NextResponse.json({ error: "Missing required fields: userId or image" }, { status: 400 })
-    }
-
-    // Get the user's current stage
-    const userCompletedStages = userStages[userId] || new Set()
-    const nextStage = UPLOAD_SEQUENCE.find((stage) => !userCompletedStages.has(`${stage}_uploaded`)) as
-      | ImageType
-      | undefined
-
-    if (!nextStage) {
-      return NextResponse.json({ error: "All images have already been uploaded." }, { status: 400 })
-    }
-
-    // Get face details
-    const faceDetails = await getFaceDetails(image)
-    const verificationResults = verifyFaceDetails(faceDetails, nextStage)
-
-    if (!verificationResults) {
-      return NextResponse.json(
-        { error: `Invalid image for ${nextStage}. Please ensure the face is positioned correctly.` },
-        { status: 400 },
-      )
-    }
-
-    // Upload image to S3
-    const fileKey = `images/${userId}/${nextStage}.jpg`
-    const s3UploadResult = await uploadImageToS3(fileKey, await convertImageToBuffer(image))
-
-    if (!s3UploadResult.success) {
-      return NextResponse.json({ error: s3UploadResult.error }, { status: 500 })
-    }
-
-    // Mark current stage as completed
-    if (!userStages[userId]) {
-      userStages[userId] = new Set<string>()
-    }
-    userStages[userId].add(`${nextStage}_uploaded`)
-    if (!userResults[userId]) {
-      userResults[userId] = {} as Record<ImageType, string>
-    }
-    userResults[userId][nextStage] = "uploaded"
-
-    return NextResponse.json({
-      success: true,
-      nextStage,
-      userStages: Array.from(userStages[userId]),
-      userResults: userResults[userId],
-    })
-  } catch (error) {
-    console.error("Error in face validation:", error)
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
-  }
-}
-
 async function convertImageToBuffer(image: string): Promise<Buffer> {
-  console.log("Converting image to buffer...")
   try {
     if (image.startsWith("data:image")) {
-      // Base64 encoded image
       const base64Data = image.split(",")[1]
       return Buffer.from(base64Data, "base64")
     } else {
-      // Binary image data
       return Buffer.from(image, "binary")
     }
   } catch (error) {
@@ -243,8 +180,10 @@ async function convertImageToBuffer(image: string): Promise<Buffer> {
   }
 }
 
-async function uploadImageToS3(fileKey: string, buffer: Buffer): Promise<{ success: boolean; error?: string }> {
-  console.log("Uploading image to S3 with key:", fileKey)
+async function uploadImageToS3(
+  fileKey: string,
+  buffer: Buffer,
+): Promise<{ success: boolean; s3Key: string; error?: string }> {
   try {
     await s3
       .putObject({
@@ -254,11 +193,119 @@ async function uploadImageToS3(fileKey: string, buffer: Buffer): Promise<{ succe
         ContentType: "image/jpeg",
       })
       .promise()
-    console.log("Image successfully uploaded to S3.")
-    return { success: true }
+    return { success: true, s3Key: fileKey }
   } catch (error) {
     console.error("Error uploading image to S3:", error)
-    return { success: false, error: "Failed to upload image to S3." }
+    return { success: false, s3Key: "", error: "Failed to upload image to S3." }
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { userId, image, step } = imageUploadSchema.parse(body)
+
+   
+
+    if (!image || !step || !userId) { 
+
+      return NextResponse.json(
+        { success: false, error: "Image, userId and step are required." },
+        { status: 400 },
+        )
+    }
+    // check for user exists
+    const userExist = await SelfieService.checkUserExist(userId)
+    if (!userExist) {
+      console.log("User does not exist")
+      return NextResponse.json({ success: false, error: "User does not exist." }, { status: 404 })
+    }
+
+    // Get face details and verify
+    const faceDetails = await getFaceDetails(image)
+    const verificationResults = verifyFaceDetails(faceDetails, step)
+
+    if (!verificationResults) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid image for ${step}. Please ensure the face is positioned correctly.`,
+        },
+        { status: 400 },
+      )
+    }
+
+    const fileKey = `selfie-verification/${userId}/${step}-${Date.now()}.jpg`
+    const s3UploadResult = await uploadImageToS3(fileKey, await convertImageToBuffer(image))
+
+    if (!s3UploadResult.success) {
+      return NextResponse.json({ success: false, error: s3UploadResult.error }, { status: 500 })
+    }
+
+    // Update verification in database
+    const metadata = {
+      brightness: faceDetails.Quality?.Brightness,
+      facePosition: step,
+      confidence: faceDetails.EyesOpen?.Confidence,
+    }
+
+    const progress = await SelfieService.updateStep(userId, step, s3UploadResult.s3Key, metadata)
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        step,
+        progress,
+        s3Key: s3UploadResult.s3Key,
+      },
+    })
+  } catch (error) {
+    console.error("Error in selfie verification:", error)
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid request data",
+          details: error.errors,
+        },
+        { status: 400 },
+      )
+    }
+
+    if (error instanceof ImageProcessingError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          errorType: error.errorType,
+        },
+        { status: 400 },
+      )
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Internal server error",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const userId = req.nextUrl.searchParams.get("userId")
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "userId is required" }, { status: 400 })
+    }
+
+    const status = await SelfieService.getVerificationStatus(userId)
+    return NextResponse.json({ success: true, data: status })
+  } catch (error) {
+    console.error("Error getting verification status:", error)
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }
 

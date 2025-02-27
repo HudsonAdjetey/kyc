@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Camera, FileText, ShieldCheck, AlertTriangle } from "lucide-react";
-import { IdType } from "@/components/kyc/DocumentCapture";
 import { motion, AnimatePresence } from "framer-motion";
 import { UseUserInfo } from "@/hooks/useUserInfo";
 import ImageBlur from "@/components/common/ImageBlur";
@@ -24,16 +23,37 @@ import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
+import { DocumentType } from "@/lib/types";
 
-const ID_TYPE_LABELS: Record<IdType, string> = {
-  passport: "Passport",
-  driverLicense: "Driver's License",
-  nationalId: "National ID",
+const ID_TYPE_LABELS: Record<DocumentType, string> = {
+  PASSPORT: "Passport",
+  GHANA_CARD: "Ghana Card",
+  DRIVERS_LICENSE: "Driver's License",
+  VOTER_ID: "Voter ID",
+  UNKNOWN: "Ghana Card",
 };
-
 const DocumentStep = () => {
   const [documentStage, setDocumentStage] = useState<Step | "submit" | "">("");
-  const [selectedIdType, setSelectedIdType] = useState<IdType>("nationalId");
+  const [selectedIdType, setSelectedIdType] =
+    useState<DocumentType>("GHANA_CARD");
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const storedIdType = localStorage.getItem(
+      "selectedIdType"
+    ) as DocumentType | null;
+    if (storedIdType) {
+      setSelectedIdType(storedIdType);
+    } else {
+      setSelectedIdType("GHANA_CARD");
+    }
+  }, []);
+
+  // Save to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem("selectedIdType", selectedIdType);
+  }, [selectedIdType]);
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [images, setImages] = useState<Record<string, string>>({});
   const { userInfo } = UseUserInfo();
@@ -103,7 +123,9 @@ const DocumentStep = () => {
               <Label className="text-base">Select Document Type</Label>
               <Select
                 value={selectedIdType}
-                onValueChange={(value: IdType) => setSelectedIdType(value)}
+                onValueChange={(value) =>
+                  setSelectedIdType(value as DocumentType)
+                }
               >
                 <SelectTrigger className="w-full py-6">
                   <SelectValue placeholder="Select ID Type" />
@@ -202,15 +224,7 @@ const DocumentStep = () => {
                     <ShieldCheck className="w-5 h-5" />
                     Submit Documents for Verification
                   </motion.button>
-                ) : // <motion.button
-                //   key="proceed"
-                //   disabled={!documentStage}
-                //   className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                // >
-                //   <Camera className="w-5 h-5" />
-                //   Capture Document
-                // </motion.button>
-                null}
+                ) : null}
               </AnimatePresence>
 
               <p className="text-sm text-gray-500 text-center">

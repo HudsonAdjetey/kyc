@@ -1,5 +1,5 @@
 import { logger } from "./logger"
-import { DocumentType, ExtractedFields, ValidationResult } from "./types"
+import type { DocumentType, ExtractedFields, ValidationResult } from "./types"
 
 export function validateDocument(
   documentType: DocumentType,
@@ -75,12 +75,12 @@ function validateGender(gender: string): boolean {
 
 function validatePassportNumber(passportNumber: string): boolean {
   // Implement passport number validation logic
-  return /^[A-Z]\d{8}$/.test(passportNumber)
+  return /^[A-Z]\d{8}$/.test(passportNumber) // Example format: G12345678
 }
 
 function validateLicenseNumber(licenseNumber: string): boolean {
   // Implement license number validation logic
-  return /^\d{6}-\d{2}-\d{6}$/.test(licenseNumber) 
+  return /^\d{6}-\d{2}-\d{6}$/.test(licenseNumber) // Example format: 123456-12-123456
 }
 
 function validateAddress(address: string): boolean {
@@ -90,7 +90,7 @@ function validateAddress(address: string): boolean {
 
 function validateVoterIdNumber(voterIdNumber: string): boolean {
   // Implement voter ID number validation logic
-  return /^\d{10}$/.test(voterIdNumber) 
+  return /^\d{10}$/.test(voterIdNumber) // Example format: 1234567890
 }
 
 function validatePollingStation(pollingStation: string): boolean {

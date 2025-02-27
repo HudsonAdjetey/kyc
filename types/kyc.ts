@@ -24,6 +24,12 @@ export interface VerificationSession {
   completedAt?: Date
 }
 
+export interface DocumentProcessingError extends Error {
+  code: "NO_FACE_DETECTED" | "INVALID_DOCUMENT" | "EXTRACTION_FAILED"
+  details?: Record<string, unknown>
+}
+
+
 export interface VerificationResponse {
   verified: boolean
   message: string
@@ -34,6 +40,7 @@ export interface VerificationResponse {
 export type VerificationStepId = "face" | "left" | "right" | "blink"
 
 
+export type DocSide = "front" | "back"
 
 
 export interface CaptureResult {

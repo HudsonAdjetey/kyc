@@ -1,5 +1,7 @@
  type Step = "preload" | "selfie" | "document" | "front" | "back" | "complete"
 
+
+ 
  interface VerificationStep {
   id: Step
   title: string

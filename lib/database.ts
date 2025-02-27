@@ -12,8 +12,7 @@ interface DocumentRecord {
   createdAt: Date
 }
 
-// This is a simple in-memory database for demonstration purposes
-// In a real application, you would use a proper database like PostgreSQL or MongoDB
+
 const documents: Record<string, DocumentRecord> = {}
 
 export async function createDocumentRecord(data: Omit<DocumentRecord, "id" | "createdAt">): Promise<DocumentRecord> {
@@ -36,4 +35,5 @@ export async function getDocumentStatus(id: string): Promise<DocumentRecord | nu
 function generateId(): string {
   return Math.random().toString(36).substr(2, 9)
 }
+
 

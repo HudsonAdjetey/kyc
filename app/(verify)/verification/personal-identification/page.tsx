@@ -5,13 +5,17 @@ import "react-phone-number-input/style.css";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import PhoneInput from "react-phone-number-input";
+import PhoneInput, {
+  parsePhoneNumber,
+  isValidPhoneNumber,
+} from "react-phone-number-input";
 import { useForm, Controller } from "react-hook-form";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import countryList from "react-select-country-list";
 import { CountryCode } from "libphonenumber-js";
+import { Toaster } from "@/components/ui/toaster";
 
 import {
   Select,
@@ -20,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 interface FormData {
   phoneNumber: string;
@@ -31,6 +36,7 @@ const Personal = () => {
   const options = useMemo(() => countryList().getData(), []);
   const [selectedCountry, setSelectedCountry] = useState<string>("GH");
   const [countryError, setCountryError] = useState<string>("");
+  const [submissionError, setSubmissionError] = useState<string>("");
 
   const {
     register,
@@ -44,22 +50,91 @@ const Personal = () => {
     },
   });
 
+  const { toast } = useToast();
+
   const onSubmit = async (data: FormData) => {
     try {
       setCountryError("");
+      setSubmissionError("");
 
       if (!selectedCountry) {
-        setCountryError("Please select a country");
+        toast({
+          variant: "destructive",
+          title: "Please select a country",
+        });
         return;
       }
 
-      console.log({ ...data, country: selectedCountry });
-
-      if (data.fullName && data.phoneNumber && selectedCountry) {
-        await router.push("/verification/face-validation");
+      // Check if the phone number is valid
+      if (!isValidPhoneNumber(data.phoneNumber)) {
+        setSubmissionError("Please enter a valid phone number");
+        toast({
+          variant: "destructive",
+          title: "Incorrect Number",
+          description: "Please enter a valid number",
+        });
+        return;
       }
+
+      const parsedPhone = parsePhoneNumber(data.phoneNumber);
+      if (!parsedPhone) {
+        toast({
+          variant: "destructive",
+          title: "Incorrect Number",
+          description: "Unable to parse phone number",
+        });
+        setSubmissionError("Unable to parse phone number");
+        return;
+      }
+
+      const formattedPhone = parsedPhone.format("E.164");
+
+      const requestData = {
+        fullName: data.fullName,
+        country: selectedCountry,
+        userId: String(formattedPhone),
+        phoneNumber: formattedPhone,
+      };
+
+      console.log("Submitting data:", requestData);
+
+      const response = await fetch("/api/user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        toast({
+          variant: "destructive",
+          title: "Failed to submit verification",
+        });
+        throw new Error(errorData.message || "Failed to submit verification");
+      }
+
+      const result = await response.json();
+      console.log("Submission successful:", result);
+
+      toast({
+        variant: "default",
+        title: "success",
+        description: "Verification Submitted successfully",
+      });
+      // save to local storage
+ if (typeof window !== "undefined") {
+   window.localStorage.setItem("userId", formattedPhone);
+ }
+
+
+      router.push("/verification/face-validation");
     } catch (error) {
       console.error("Form submission error:", error);
+      setSubmissionError(
+        error instanceof Error ? error.message : "An unknown error occurred"
+      );
     }
   };
 
@@ -70,6 +145,8 @@ const Personal = () => {
 
   return (
     <div className="container mx-auto px-4 py-10">
+      <Toaster />
+
       <Link href="/verification" className="mb-6 flex items-center gap-3">
         <ChevronLeft className="w-4 h-4 mr-2" />
         Back to Verification Types
@@ -78,6 +155,12 @@ const Personal = () => {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-semibold mb-2">Personal Verification</h1>
         <p className="text-gray-600 mb-8">Please fill in your details below</p>
+
+        {submissionError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {submissionError}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-2">
@@ -129,7 +212,7 @@ const Personal = () => {
               rules={{
                 required: "Phone number is required",
                 validate: (value) => {
-                  if (value && value.length < 8) {
+                  if (!value || !isValidPhoneNumber(value)) {
                     return "Please enter a valid phone number";
                   }
                   return true;

@@ -125,6 +125,12 @@ const Back = () => {
 
   const uploadImage = useCallback(
     async (imageData: string) => {
+      let userId = "";
+      let documentType = "";
+      if (typeof window !== "undefined") {
+        userId = window.localStorage.getItem("userId") ?? "";
+        documentType = window.localStorage.getItem("selectedIdType") ?? "";
+      }
       console.log(imageData);
       setUploading(true);
       try {
@@ -138,8 +144,9 @@ const Back = () => {
           body: JSON.stringify({
             image: imageData,
             docType: "back",
-            userId: "23323",
+            userId: userId,
             country: "ghana",
+             documentType,
           }),
         });
         const result = await response.json();

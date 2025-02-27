@@ -356,6 +356,11 @@ const SelfieStep = () => {
 
   const verifyImage = useCallback(
     async (imageData: string) => {
+      let userId = "";
+      if (typeof window !== "undefined") {
+        userId = window.localStorage.getItem("userId") ?? "";
+      }
+
       try {
         const response = await fetch("/api/verify-image", {
           method: "POST",
@@ -365,7 +370,8 @@ const SelfieStep = () => {
           body: JSON.stringify({
             image: imageData,
             imageType: steps[currentStep].id,
-            userId: "23323",
+            userId: String(userId),
+            step: steps[currentStep].id,
           }),
         });
 
