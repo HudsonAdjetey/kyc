@@ -138,6 +138,8 @@ const Back = () => {
 
         const response = await fetch("/api/verify-document", {
           method: "POST",
+          credentials: "include",
+
           headers: {
             "Content-Type": "application/json",
           },
@@ -146,7 +148,7 @@ const Back = () => {
             docType: "back",
             userId: userId,
             country: "ghana",
-             documentType,
+            documentType,
           }),
         });
         const result = await response.json();

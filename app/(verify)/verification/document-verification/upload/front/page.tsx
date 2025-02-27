@@ -138,6 +138,7 @@ const Front = () => {
 
         const response = await fetch("/api/verify-document", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },

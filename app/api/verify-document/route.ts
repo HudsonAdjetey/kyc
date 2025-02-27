@@ -5,14 +5,59 @@ import { logger } from "@/lib/logger"
 import { validateRequest } from "@/lib/validation"
 import { DocumentService } from "@/lib/services/doumentService"
 import { SelfieService } from "@/lib/services/selfieService"
-import { DocumentProcessingError } from "@/types/kyc"
+import type { DocumentProcessingError } from "@/types/kyc"
+import { getIronSession } from "iron-session"
+
+// Session configuration
+const sessionOptions = {
+  password: process.env.SESSION_PASSWORD || "complex_password_at_least_32_characters_long",
+  cookieName: "selfie_session",
+  cookieOptions: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+  },
+}
+
+// Session type
+type SessionData = {
+  userId?: string
+  sessionId?: string
+  isLoggedIn?: boolean
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userId, docType, country, image, documentType  } = await validateRequest(body)
+    const res = new NextResponse()
 
-    logger.info("Received document upload request", { userId, docType, country })
+    const session = await getIronSession<SessionData>(request, res, sessionOptions)
+
+    // Check if we have a valid session with the correct properties
+    if (!session.userId || !session.sessionId || !session.isLoggedIn) {
+   
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid session. Please complete user verification first.",
+        },
+        { status: 401 },
+      )
+    }
+
+    const body = await request.json()
+    const { userId, docType, country, image, documentType } = await validateRequest(body)
+
+    if (userId !== session.userId) {
+ 
+      return NextResponse.json(
+        {
+          success: false,
+          error: "User ID mismatch with session",
+        },
+        { status: 403 },
+      )
+    }
+
+    logger.info("Received document upload request", { userId, docType, country, sessionId: session.sessionId })
 
     // Check if user exists
     const user = await SelfieService.getVerificationStatus(userId)
@@ -28,7 +73,6 @@ export async function POST(request: NextRequest) {
     // Check document status
     const documentStatus = await DocumentService.checkDocumentStatus(userId, documentType as "front" | "back")
 
-    // If document is complete, redirect to success
     if (documentStatus.isComplete) {
       return NextResponse.json(
         {
@@ -39,7 +83,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if this side has already been uploaded
     if ((docType === "front" && documentStatus.hasFront) || (docType === "back" && documentStatus.hasBack)) {
       return NextResponse.json(
         {
@@ -51,15 +94,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Process the document
-const base64Data = image.split(",")[1]
-    
+    const base64Data = image.split(",")[1]
     const buffer = Buffer.from(base64Data, "base64")
-        let s3Key = ""
+    let s3Key = ""
 
     try {
       const processingResult = await processDocument(buffer, docType as "front" | "back", documentType, country)
 
-      // Upload to S3 only if processing is successful
       if (!processingResult) {
         return NextResponse.json(
           {
@@ -68,9 +109,9 @@ const base64Data = image.split(",")[1]
           { status: 400 },
         )
       }
-      s3Key = await uploadToS3(userId, docType, buffer)
 
-      // Store the extracted information in MongoDB
+      s3Key = await uploadToS3(userId, session.sessionId, docType, documentType, buffer)
+
       const document = await DocumentService.createOrUpdateDocument(
         userId,
         documentType,
@@ -79,24 +120,32 @@ const base64Data = image.split(",")[1]
         processingResult.extractedFields,
       )
 
-      // Check if document is now complete
       const updatedStatus = await DocumentService.checkDocumentStatus(userId, docType as "front" | "back")
       const redirect = updatedStatus.isComplete ? "/kyc/success" : undefined
 
       logger.info("Document processed and stored successfully", {
         userId,
+        sessionId: session.sessionId,
         documentId: document._id,
         documentType,
         docType,
       })
 
-      return NextResponse.json({
+      const finalResponse = NextResponse.json({
         message: "Document uploaded and processed successfully",
         documentId: document._id,
         status: document.verificationStatus,
         extractedFields: processingResult.extractedFields,
         redirect,
       })
+
+      res.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "set-cookie") {
+          finalResponse.headers.set(key, value)
+        }
+      })
+
+      return finalResponse
     } catch (processingError) {
       const error = processingError as DocumentProcessingError
       let errorMessage = "Document processing failed"
@@ -139,10 +188,33 @@ const base64Data = image.split(",")[1]
 
 export async function GET(request: NextRequest) {
   try {
-    const {
-      userId,
-      documentId,
-    } = await request.json()
+    const res = new NextResponse()
+
+    const session = await getIronSession<SessionData>(request, res, sessionOptions)
+
+    if (!session.userId || !session.sessionId || !session.isLoggedIn) {
+     
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid session. Please complete user verification first.",
+        },
+        { status: 401 },
+      )
+    }
+
+    const { userId, documentId } = await request.json()
+
+    // Verify that the userId in the request matches the session
+    if (userId && userId !== session.userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "User ID mismatch with session",
+        },
+        { status: 403 },
+      )
+    }
 
     if (!userId && !documentId) {
       return NextResponse.json({ error: "Missing userId or documentId" }, { status: 400 })
@@ -153,12 +225,23 @@ export async function GET(request: NextRequest) {
       if (!document) {
         return NextResponse.json({ error: "Document not found" }, { status: 404 })
       }
-      return NextResponse.json(document)
+
+      const finalResponse = NextResponse.json(document)
+
+      // Copy cookies from res to finalResponse
+      res.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "set-cookie") {
+          finalResponse.headers.set(key, value)
+        }
+      })
+
+      return finalResponse
     }
 
     if (userId) {
       const documents = await DocumentService.findByUserId(userId)
-      return NextResponse.json({
+
+      const finalResponse = NextResponse.json({
         documents: documents.map((doc) => ({
           id: doc._id,
           type: doc.documentType,
@@ -178,6 +261,15 @@ export async function GET(request: NextRequest) {
           extractedData: doc.extractedData,
         })),
       })
+
+      // Copy cookies from res to finalResponse
+      res.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "set-cookie") {
+          finalResponse.headers.set(key, value)
+        }
+      })
+
+      return finalResponse
     }
   } catch (error) {
     logger.error("Error retrieving document status", error as Error)

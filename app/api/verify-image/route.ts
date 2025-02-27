@@ -3,6 +3,24 @@ import AWS from "aws-sdk"
 import { SelfieService } from "@/lib/services/selfieService"
 import { SelfieStep } from "@/lib/model/selfie"
 import { z } from "zod"
+import { getIronSession } from "iron-session"
+
+// Session configuration
+const sessionOptions = {
+  password: process.env.SESSION_PASSWORD || "complex_password_at_least_32_characters_long",
+  cookieName: "selfie_session",
+  cookieOptions: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+  },
+}
+
+// Session type
+type SessionData = {
+  userId?: string
+  sessionId?: string
+  isLoggedIn?: boolean
+}
 
 // Configure AWS SDK
 AWS.config.update({
@@ -202,26 +220,30 @@ async function uploadImageToS3(
 
 export async function POST(req: NextRequest) {
   try {
+    // Create a response object to manipulate cookies
+    const res = new NextResponse()
+
+    // Get the session
+    const session = await getIronSession<SessionData>(req, res, sessionOptions)
+
+    if (!session.sessionId) {
+      session.sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
+      await session.save()
+    }
+
     const body = await req.json()
     const { userId, image, step } = imageUploadSchema.parse(body)
 
-   
-
-    if (!image || !step || !userId) { 
-
-      return NextResponse.json(
-        { success: false, error: "Image, userId and step are required." },
-        { status: 400 },
-        )
+    if (!image || !step || !userId) {
+      return NextResponse.json({ success: false, error: "Image, userId and step are required." }, { status: 400 })
     }
-    // check for user exists
+
     const userExist = await SelfieService.checkUserExist(userId)
     if (!userExist) {
       console.log("User does not exist")
       return NextResponse.json({ success: false, error: "User does not exist." }, { status: 404 })
     }
 
-    // Get face details and verify
     const faceDetails = await getFaceDetails(image)
     const verificationResults = verifyFaceDetails(faceDetails, step)
 
@@ -235,30 +257,44 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const fileKey = `selfie-verification/${userId}/${step}-${Date.now()}.jpg`
+    const stepFolder = step.toLowerCase()
+    const filename = `${Date.now()}.jpg`
+    const fileKey = `${userId}/${session.sessionId}/${stepFolder}/${filename}`
+
     const s3UploadResult = await uploadImageToS3(fileKey, await convertImageToBuffer(image))
 
     if (!s3UploadResult.success) {
       return NextResponse.json({ success: false, error: s3UploadResult.error }, { status: 500 })
     }
 
-    // Update verification in database
     const metadata = {
       brightness: faceDetails.Quality?.Brightness,
       facePosition: step,
       confidence: faceDetails.EyesOpen?.Confidence,
+      sessionId: session.sessionId,
     }
 
     const progress = await SelfieService.updateStep(userId, step, s3UploadResult.s3Key, metadata)
 
-    return NextResponse.json({
+    //headers from the response object to maintain the session cookie
+    const finalResponse = NextResponse.json({
       success: true,
       data: {
         step,
         progress,
         s3Key: s3UploadResult.s3Key,
+        sessionId: session.sessionId,
       },
     })
+
+    // cookies from res to finalResponse
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === "set-cookie") {
+        finalResponse.headers.set(key, value)
+      }
+    })
+
+    return finalResponse
   } catch (error) {
     console.error("Error in selfie verification:", error)
 
@@ -296,13 +332,33 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const res = new NextResponse()
+
+    // Get the session
+    const session = await getIronSession<SessionData>(req, res, sessionOptions)
+
     const userId = req.nextUrl.searchParams.get("userId")
     if (!userId) {
       return NextResponse.json({ success: false, error: "userId is required" }, { status: 400 })
     }
 
     const status = await SelfieService.getVerificationStatus(userId)
-    return NextResponse.json({ success: true, data: status })
+
+    const finalResponse = NextResponse.json({
+      success: true,
+      data: {
+        ...status,
+        sessionId: session.sessionId,
+      },
+    })
+
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === "set-cookie") {
+        finalResponse.headers.set(key, value)
+      }
+    })
+
+    return finalResponse
   } catch (error) {
     console.error("Error getting verification status:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })

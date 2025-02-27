@@ -100,6 +100,7 @@ const Personal = () => {
 
       const response = await fetch("/api/user", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -124,10 +125,9 @@ const Personal = () => {
         description: "Verification Submitted successfully",
       });
       // save to local storage
- if (typeof window !== "undefined") {
-   window.localStorage.setItem("userId", formattedPhone);
- }
-
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("userId", formattedPhone);
+      }
 
       router.push("/verification/face-validation");
     } catch (error) {
