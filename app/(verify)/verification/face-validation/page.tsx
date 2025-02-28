@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
 import * as faceapi from "face-api.js";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Link from "next/link";
 interface VerificationStep {
   id: string;
   title: string;
@@ -1003,6 +1004,14 @@ const SelfieStep = () => {
                   </svg>
                   Your data is encrypted and securely processed
                 </div>
+                {!isCapturing && (
+                  <Link
+                    className="text-blue-600 font-medium"
+                    href="/verification/document-verification"
+                  >
+                    Have already verified? Continue
+                  </Link>
+                )}
               </div>
             </div>
           </div>

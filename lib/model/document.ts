@@ -25,10 +25,9 @@ export interface IDocument extends Document {
 const DocumentSchema = new Schema(
   {
     userId: {
-      type: Schema.Types.ObjectId,
+      type:String,
       ref: "User",
       required: true,
-      index: true,
     },
     documentType: {
       type: String,
@@ -73,7 +72,6 @@ const DocumentSchema = new Schema(
 )
 
 // Create indexes
-DocumentSchema.index({ userId: 1, documentType: 1 })
 DocumentSchema.index({ idNumber: 1 })
 DocumentSchema.index({ verificationStatus: 1 })
 

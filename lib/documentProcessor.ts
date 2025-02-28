@@ -87,7 +87,7 @@ export async function processDocument(
 function validateRequiredFields(documentType: DocumentType, docSide: DocSide, fields: Record<string, string>): void {
   const requiredFields: Record<DocumentType, Record<DocSide, string[]>> = {
     GHANA_CARD: {
-      front: ["cardNumber", "fullName", "dateOfBirth"],
+      front: ["cardNumber", "fullName",],
       back: ["dateOfExpiry", "dateOfIssue"],
     },
     PASSPORT: {

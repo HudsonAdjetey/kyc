@@ -26,8 +26,6 @@ const Back = () => {
   const [uploading, setUploading] = useState<boolean>(false);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [selfieImage, setSelfieImage] = useState<string>("");
   const [processing, setProcessing] = useState<boolean>(false);
   const router = useRouter();
   const handleError = useCallback(

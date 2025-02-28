@@ -59,13 +59,13 @@ function extractGhanaCardNumber(rekognitionResult: TextDetection[], textractResu
 
 function extractFullName(rekognitionResult: TextDetection[], textractResult: Block[]): string {
   // Implement full name extraction logic
-  const nameLabels = ["name:", "full name:", "surname:", "given names:"]
+   const nameLabels = ["name:", "full name:", "surname:", "given names:", "firstnames", "firstnames/prenoms", "Firstnames/Prenoms", "Surname/Nom"]
+
   return extractFieldByLabels(textractResult, nameLabels)
 }
 
 function extractDateOfBirth(rekognitionResult: TextDetection[], textractResult: Block[]): string {
-  // Implement date of birth extraction logic
-  const dobLabels = ["date of birth:", "dob:"]
+  const dobLabels = ["date of birth:", "dob:", "Date of Birth/Date de Naisasance"]
   return extractFieldByLabels(textractResult, dobLabels)
 }
 

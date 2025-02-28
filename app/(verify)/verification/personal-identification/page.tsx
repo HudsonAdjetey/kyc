@@ -109,15 +109,15 @@ const Personal = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.log(errorData);
         toast({
           variant: "destructive",
-          title: "Failed to submit verification",
+          title: errorData.error,
         });
-        throw new Error(errorData.message || "Failed to submit verification");
+        throw new Error("Failed to submit verification");
       }
 
-      const result = await response.json();
-      console.log("Submission successful:", result);
+  await response.json();
 
       toast({
         variant: "default",

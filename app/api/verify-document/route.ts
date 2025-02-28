@@ -4,7 +4,6 @@ import { uploadToS3 } from "@/lib/s3"
 import { logger } from "@/lib/logger"
 import { validateRequest } from "@/lib/validation"
 import { DocumentService } from "@/lib/services/doumentService"
-import { SelfieService } from "@/lib/services/selfieService"
 import type { DocumentProcessingError } from "@/types/kyc"
 import { getIronSession } from "iron-session"
 
@@ -31,9 +30,8 @@ export async function POST(request: NextRequest) {
 
     const session = await getIronSession<SessionData>(request, res, sessionOptions)
 
-    // Check if we have a valid session with the correct properties
     if (!session.userId || !session.sessionId || !session.isLoggedIn) {
-   
+      
       return NextResponse.json(
         {
           success: false,
@@ -45,8 +43,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { userId, docType, country, image, documentType } = await validateRequest(body)
+    if (!session.sessionId) {
 
-    if (userId !== session.userId) {
  
       return NextResponse.json(
         {
@@ -59,8 +57,7 @@ export async function POST(request: NextRequest) {
 
     logger.info("Received document upload request", { userId, docType, country, sessionId: session.sessionId })
 
-    // Check if user exists
-    const user = await SelfieService.getVerificationStatus(userId)
+    const user = await DocumentService.findByUserId(userId)
     if (!user) {
       return NextResponse.json(
         {
@@ -70,7 +67,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check document status
     const documentStatus = await DocumentService.checkDocumentStatus(userId, documentType as "front" | "back")
 
     if (documentStatus.isComplete) {
@@ -137,6 +133,7 @@ export async function POST(request: NextRequest) {
         status: document.verificationStatus,
         extractedFields: processingResult.extractedFields,
         redirect,
+        success: true
       })
 
       res.headers.forEach((value, key) => {
@@ -191,7 +188,7 @@ export async function GET(request: NextRequest) {
     const res = new NextResponse()
 
     const session = await getIronSession<SessionData>(request, res, sessionOptions)
-
+    console.log("Session", session)
     if (!session.userId || !session.sessionId || !session.isLoggedIn) {
      
       return NextResponse.json(
@@ -205,12 +202,11 @@ export async function GET(request: NextRequest) {
 
     const { userId, documentId } = await request.json()
 
-    // Verify that the userId in the request matches the session
-    if (userId && userId !== session.userId) {
+    if (userId && !session.userId) {
       return NextResponse.json(
         {
           success: false,
-          error: "User ID mismatch with session",
+          error: `User ID mismatch with session ${session.userId}`,
         },
         { status: 403 },
       )
@@ -283,3 +279,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
+ 

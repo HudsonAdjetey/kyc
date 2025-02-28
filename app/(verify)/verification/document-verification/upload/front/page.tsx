@@ -155,11 +155,10 @@ const Front = () => {
         if (!result.success) {
           toast({
             variant: "destructive",
-            title: "Document captured error",
+            title: result.error,
             description: "Try again",
           });
-
-          throw new Error("Upload failed");
+          return;
         }
 
         toast({
