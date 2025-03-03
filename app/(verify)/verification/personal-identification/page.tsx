@@ -242,7 +242,7 @@ const Personal = () => {
             disabled={isSubmitting}
             className="w-full bg-orange-400 hover:bg-orange-300 text-white py-6 disabled:opacity-50"
           >
-            {isSubmitting ? "Submitting..." : "Submit Verification"}
+            {isSubmitting ? "Creating Account..." : "Create Account"}
           </Button>
         </form>
       </div>
